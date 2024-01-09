@@ -2,9 +2,13 @@ import numpy  as np
 from functools import partial
 
 import utils_calculating_cl
+import DataInfo
+import nml_regret
 
 class DataEncoding:
-    def __init__(self, data_info):
+    def __init__(self, 
+                 data_info: DataInfo.DataInfo
+                 ):
         self.data_info = data_info
         self.num_class = data_info.num_class
         self.calc_probs = partial(utils_calculating_cl.calc_probs, num_class=self.num_class)
@@ -58,7 +62,14 @@ class NMLencoding(DataEncoding):
         : float
             Code length of the data covered by the else rule
         """
-        pass
+        p = self.calc_probs(self.data_info.target[ruleset.uncovered_indices])
+
+        # Because of this below line of code, this function needs to be called after updating the ruleset's attributes
+        coverage = len(ruleset.uncovered_indices)
+
+        negloglike_rule = -coverage * np.sum(np.log2(p[p != 0]) * p[p != 0])
+        reg = nml_regret.regret(coverage, self.data_info.num_class)
+        return negloglike_rule + reg
 
     def get_cl_data_excl(self, ruleset, rule, bool):
         """ Get the code length of the data if rule is added to ruleset

@@ -1,10 +1,19 @@
 import numpy as np
 
+import utils_calculating_cl
+import nml_regret
+import utils_readable
+import Beam
+import RuleGrowConstraint
+import DataInfo
+
+import constant
+
 class Rule:
     def __init__(self, 
                  indices, 
                  indices_excl_overlap, 
-                 data_info, 
+                 data_info: DataInfo.DataInfo,
                  rule_base, 
                  condition_matrix, 
                  ruleset,

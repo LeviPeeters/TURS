@@ -1,9 +1,5 @@
 from numba import njit
 import numpy as np
-import scipy.special
-import constant
-import random
-import nml_regret
 
 @njit
 def calc_probs(target, num_class, smoothed=False):
@@ -23,7 +19,10 @@ def calc_probs(target, num_class, smoothed=False):
     probs : Array
         Probability of encountering each target
     """
-    pass
+    counts = np.bincount(target, minlength=num_class)
+    if smoothed:
+        counts = counts + np.ones(num_class, dtype=int) 
+    return counts / np.sum(counts)
 
 @njit
 def calc_negloglike(p, n):

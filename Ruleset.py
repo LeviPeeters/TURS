@@ -1,5 +1,15 @@
 import numpy as np
 
+import Rule
+import Beam
+import ModellingGroup
+import DataInfo
+import utils_readable
+import utils_predict
+import utils_calculating_cl
+import ModelEncoding
+import DataEncoding
+
 def make_rule_from_grow_info(grow_info):
     pass
 
@@ -8,11 +18,41 @@ def extract_rules_from_beams(beams):
 
 class Ruleset:
     def __init__(self,
-                 data_info,
-                 data_encoding,
-                 model_encoding,
+                 data_info: DataInfo.DataInfo,
+                 data_encoding: DataEncoding.NMLencoding,
+                 model_encoding: ModelEncoding.ModelEncodingDependingOnData,
                  constraints = None):
-        pass
+        
+        self.log_folder_name = None
+
+        self.data_info = data_info
+        self.model_encoding = model_encoding
+        self.data_encoding = data_encoding
+
+        self.rules = []
+
+        self.uncovered_indices = np.arange(data_info.nrow)
+        self.uncovered_bool = np.ones(self.data_info.nrow, dtype=bool)
+        self.else_rule_p = utils_calculating_cl.calc_probs(target=data_info.target, num_class=data_info.num_class)
+        self.else_rule_coverage = self.data_info.nrow
+        self.elserule_total_cl = self.data_encoding.get_cl_data_elserule(ruleset=self)
+
+        self.negloglike = -np.sum(data_info.nrow * np.log2(self.else_rule_p[self.else_rule_p != 0]) * self.else_rule_p[self.else_rule_p != 0])
+        self.else_rule_negloglike = self.negloglike
+
+        self.cl_data = self.elserule_total_cl
+        self.cl_model = 0  # cl model for the whole rule set (including the number of rules)
+        self.allrules_cl_model = 0  # cl model for all rules, summed up
+        self.total_cl = self.cl_model + self.cl_data  # total cl with 0 rules
+
+        self.modelling_groups = []
+
+        self.allrules_cl_data = 0
+
+        if constraints is None:
+            self.constraints = {}
+        else:
+            self.constraints = constraints
 
     def add_rule(self, rule):
         """ Add a rule to the ruleset and update code length accordingly
