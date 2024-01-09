@@ -63,7 +63,7 @@ for fold in range(5):
         beam_width=10,
         log_learning_process=False,
         dataset_name=None,
-        feature_names=["X" + str(i) for i in range(X.shape[1])],
+        feature_names=d.columns[:-1],
         validity_check="either"
         )
     data_info = DataInfo.DataInfo(X=X_train, y=y_train, beam_width=None, alg_config=alg_config)
