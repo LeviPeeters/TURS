@@ -54,7 +54,7 @@ class Ruleset:
         pass
 
     def fit(self, max_iter=1000, printing=True):
-        """ Fit the dat by iteratively adding rules to the ruleset
+        """ Fit the data by iteratively adding rules to the ruleset
         
         Parameters
         ---

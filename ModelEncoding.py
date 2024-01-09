@@ -7,3 +7,4 @@ class ModelEncodingDependingOnData:
 
     def cache_cl_model(self, data_ncol, max_rule_length, candidate_cuts):
         #TODO: This requires a bit more brain power 
+        pass
