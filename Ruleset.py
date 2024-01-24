@@ -57,6 +57,8 @@ def extract_rules_from_beams(beams):
     coverage_list = []
     for beam in beams:
         for info in beam.infos:
+            # Check if there is already a rule with the same coverage
+            # TODO there must be a better way to do this
             if info["coverage_incl"] in coverage_list:
                 index_equal = coverage_list.index(info["coverage_incl"])
                 if np.all(rules[index_equal].indices == info["_rule"].indices[info["incl_bi_array"]]):
@@ -114,7 +116,18 @@ class Ruleset:
         rule : Rule object
             Rule to be added to the ruleset
         """
-        pass
+        # Append the rule
+        self.rules.append(rule)
+        
+        # 
+        self.cl_data, self.allrules_cl_data = \
+            self.data_encoding.update_ruleset_and_get_cl_data_ruleset_after_adding_rule(ruleset=self, rule=rule)
+        self.cl_model = \
+            self.model_encoding.cl_model_after_growing_rule_on_icol(rule=rule, ruleset=self, icol=None, cut_option=None)
+
+        # Update total codelength
+        self.total_cl = self.cl_data + self.cl_model
+        self.allrules_cl_model += rule.cl_model
 
     def update_else_rule(self, rule):
         """ Update properties of the else rule
@@ -128,7 +141,11 @@ class Ruleset:
         ---
         None
         """
-        pass
+        self.uncovered_bool = np.bitwise_and(self.uncovered_bool, ~rule.bool_array)
+        self.uncovered_indices = np.where(self.uncovered_bool)[0]
+        self.else_rule_coverage = len(self.uncovered_indices)
+        self.else_rule_p = utils_calculating_cl.calc_probs(self.data_info.target[self.uncovered_indices], self.data_info.num_class)
+        self.else_rule_negloglike = utils_calculating_cl.calc_negloglike(self.else_rule_p, self.else_rule_coverage)
 
     def get_negloglike_all_modelling_groups(self, rule):
         """ Calculate the negative log-likelihood of the modelling groups for a given rule
@@ -171,7 +188,23 @@ class Ruleset:
             
             # Grow a rule
             rule_to_add = self.search_next_rule(k_consecutively=5)
-            
+
+            # Question: Why is the criterion gain per uncovered coverage? 
+            # The algorithm says the gain is the criterion, and we do a diversite check
+            if rule_to_add.incl_gain_per_excl_coverage > 0:
+                self.add_rule(rule_to_add)
+                total_cl.append(self.total_cl)
+                if self.data_info.log_learning_process:
+                    # TODO
+                    pass
+            else:
+                break
+
+        if self.data_info.log_learning_process:
+            # TODO
+            pass
+    
+        return total_cl
 
         
 

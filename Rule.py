@@ -108,6 +108,7 @@ class Rule:
 
     def get_candidate_cuts_icol_given_rule(self, candidate_cuts, icol):
         """ Given a list of candidate cuts and an index of a feature, return the candidate cuts for that feature.
+        Only returns candidate cuts that have remaining data points on both sides of the cut.
         
         Parameters
         ---
@@ -120,7 +121,15 @@ class Rule:
         candidate_cuts_icol : Array
             List of candidate cuts for the feature
         """
-        pass
+        if self.rule_base is None:
+            candidate_cuts_selector = (candidate_cuts[icol] < np.max(self.features_excl[:, icol])) & \
+                                      (candidate_cuts[icol] > np.min(self.features_excl[:, icol]))
+            candidate_cuts_icol = candidate_cuts[icol][candidate_cuts_selector]
+        else:
+            candidate_cuts_selector = (candidate_cuts[icol] < np.max(self.features[:, icol])) & \
+                                      (candidate_cuts[icol] > np.min(self.features[:, icol]))
+            candidate_cuts_icol = candidate_cuts[icol][candidate_cuts_selector]
+        return candidate_cuts_icol
 
     def update_grow_beam(self, bi_array, excl_bi_array, icol, cut, cut_option, incl_coverage, excl_coverage,
                          grow_info_beam: Beam.GrowInfoBeam, grow_info_beam_excl: Beam.GrowInfoBeam, _validity):
@@ -241,7 +250,7 @@ class Rule:
 
 
     def calculate_mdl_gain(self, bi_array, excl_bi_array, icol, cut_option):
-        """ Calculate the MDL gain when adding a cut to the rule.
+        """ Calculate the MDL gain when adding a cut to the rule by calling various functions in the model and data encoding.
         
         Parameters
         ---
