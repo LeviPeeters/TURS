@@ -88,7 +88,7 @@ class Rule:
         : Array
             Vector containing the probability of encountering each target
         """
-        return utils_calculating_cl.calc_probs(target, num_class=self.data_info.num_class, smoothed=False)
+        return utils_calculating_cl.calc_probs(target, num_class=self.data_info.num_class)
 
     def get_bool_array(self, indices):
         """ Given a list of indices, return a boolean array with True at the indices in the list.
@@ -194,9 +194,9 @@ class Rule:
         
         Parameters
         ---
-        grow_info_beam : DiverseCovarianceBeam object
+        grow_info_beam : DiverseCovBeam object
             Beam object to store information for this grow step
-        grow_info_beam_excl : DiverseCovarianceBeam object
+        grow_info_beam_excl : DiverseCovBeam object
             Beam of object to store information for this grow step without considering previously covered instances
             
         Returns

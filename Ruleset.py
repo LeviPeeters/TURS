@@ -28,12 +28,17 @@ def make_rule_from_grow_info(grow_info):
     indices = rule.indices[grow_info["incl_bi_array"]]
     indices_excl_overlap = rule.indices_excl_overlap[grow_info["excl_bi_array"]]
 
+    # Update the condition matrix
     condition_matrix = np.array(rule.condition_matrix)
     condition_matrix[grow_info["cut_option"], grow_info["icol"]] = grow_info["cut"]
+    
+    # Add the column to the list of columns in order if it's not there yet
     if grow_info["icol"] in rule.icols_in_order:
         new_icols_in_order = rule.icols_in_order
     else:
         new_icols_in_order = rule.icols_in_order + [grow_info["icol"]]
+
+
     rule = Rule(indices=indices, indices_excl_overlap=indices_excl_overlap, data_info=rule.data_info,
                 rule_base=rule, condition_matrix=condition_matrix, ruleset=rule.ruleset,
                 excl_mdl_gain=grow_info["excl_mdl_gain"],
@@ -190,7 +195,7 @@ class Ruleset:
             rule_to_add = self.search_next_rule(k_consecutively=5)
 
             # Question: Why is the criterion gain per uncovered coverage? 
-            # The algorithm says the gain is the criterion, and we do a diversite check
+            # The algorithm says the gain is the criterion, and we do a diversity check
             if rule_to_add.incl_gain_per_excl_coverage > 0:
                 self.add_rule(rule_to_add)
                 total_cl.append(self.total_cl)
@@ -238,7 +243,7 @@ class Ruleset:
 
     def combine_beams(self, incl_beam_list, excl_beam_list):
         """ Receives a list of beams, each containing the information from a grow step for a rule that's being grown
-        Finds the 
+        Finds the best rule in each coverage interval over all beams
         
         Parameters
         ---
@@ -249,8 +254,10 @@ class Ruleset:
         
         Returns
         ---
-        final_info_incl : TODO
-        final_info_excl : TODO
+        final_info_incl : list
+            list of info dicts for the best rules, including previously covered instances
+        final_info_excl : list
+            list of info dicts for the best rules, excluding previously covered instances
         """
         infos_incl, infos_excl = [], []
         coverages_incl, coverages_excl = [], []
@@ -261,7 +268,6 @@ class Ruleset:
             coverages_incl.extend([info["coverage_incl"] for info in incl_beam.infos.values() if info is not None])
         
         # Argsort the coverage lists
-        # QUESTION: Why is this array_split here
         argsorted_coverages_incl = np.argsort(coverages_incl)
         groups_coverages_incl = np.array_split([infos_incl[i] for i in argsorted_coverages_incl], self.data_info.beam_width)
 

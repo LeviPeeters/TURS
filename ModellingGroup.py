@@ -7,7 +7,17 @@ class ModellingGroup:
     which is the key for only allowing rules with similar probabilistic outputs to overlap.
     """
     def __init__(self, data_info, bool_cover, bool_use_for_model, rules_involved, prob_model, prob_cover):
-        pass
+        self.data_info = data_info
+        self.bool_cover = bool_cover  # intersection of rules
+        self.bool_model = bool_use_for_model  # union of rules
+        self.rules_involvde = rules_involved
+
+        self.cover_count = np.count_nonzero(bool_cover)
+        self.use_for_model_count = np.count_nonzero(bool_use_for_model)
+
+        self.prob_model = prob_model
+        self.prob_cover = prob_cover
+        self.negloglike = -self.cover_count * np.sum(prob_cover[prob_model != 0] * np.log2(prob_model[prob_model != 0]))
 
     def evaluate_rule_with_no_updating(self, indices):
         """ Approximately evaluate the neg_log_likelihood when growing the rule

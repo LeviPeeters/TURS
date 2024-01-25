@@ -2,7 +2,7 @@ from numba import njit
 import numpy as np
 
 @njit
-def calc_probs(target, num_class, smoothed=False):
+def calc_probs(target, num_class):
     """ Given a vector containing the targets of a set of instances, calculate the probability of encountering each target.
 
     Parameters
@@ -20,8 +20,6 @@ def calc_probs(target, num_class, smoothed=False):
         Probability of encountering each target
     """
     counts = np.bincount(target, minlength=num_class)
-    if smoothed:
-        counts = counts + np.ones(num_class, dtype=int) 
     return counts / np.sum(counts)
 
 @njit
