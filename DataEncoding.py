@@ -4,7 +4,6 @@ from functools import partial
 import utils_calculating_cl
 import DataInfo
 import nml_regret
-import Ruleset
 import Rule
 
 class DataEncoding:
@@ -37,7 +36,7 @@ class NMLencoding(DataEncoding):
         self.allrules_regret = 0
 
     def update_ruleset_and_get_cl_data_ruleset_after_adding_rule(self, 
-                                                                 ruleset: Ruleset.Ruleset, 
+                                                                 ruleset, 
                                                                  rule: Rule.Rule):
         """ Update the ruleset and get the code length of the data and the ruleset after adding a rule
         Question: Why is the else rule updated here, and not in the ruleset class?
@@ -89,7 +88,7 @@ class NMLencoding(DataEncoding):
 
     def get_cl_data_excl(self, ruleset, rule, bool):
         """ Get the code length of the data if rule is added to ruleset.
-        TODO: I don't really understand how cl_data is calculated.
+        Recalculates the else rule code length and adds this rule to allrules_cl_data
         
         Parameters
         ---
@@ -104,12 +103,12 @@ class NMLencoding(DataEncoding):
         : float
             Code length of the data when this rule is added to the ruleset
         """
-        p_rule = self.calc_probs(rule.target_excl_overlap[bool])
+        p_rule = self.calc_probs(rule.target_excl[bool])
         coverage_rule = np.count_nonzero(bool)
         negloglike_rule = -coverage_rule * np.sum(np.log2(p_rule[p_rule != 0]) * p_rule[p_rule != 0])
 
         else_bool = np.array(ruleset.uncovered_bool)
-        else_bool[rule.indices_excl_overlap[bool]] = False
+        else_bool[rule.indices_excl[bool]] = False
         coverage_else = np.count_nonzero(else_bool)
         p_else = utils_calculating_cl.calc_probs(self.data_info.target[else_bool], self.data_info.num_class)
         negloglike_else = -coverage_else * np.sum(np.log2(p_else[p_else != 0]) * p_else[p_else != 0])
@@ -122,7 +121,7 @@ class NMLencoding(DataEncoding):
 
     def get_cl_data_incl(self, ruleset, rule, excl_bi_array, incl_bi_array):
         """ Get the code length of the data if rule is added to ruleset.
-        TODO: I don't really understand how cl_data is calculated.
+        Recalculates the else rule code length and adds this rule to allrules_cl_data
         
         Parameters
         ---
@@ -142,7 +141,7 @@ class NMLencoding(DataEncoding):
         """
         excl_coverage, incl_coverage = np.count_nonzero(excl_bi_array), np.count_nonzero(incl_bi_array)
 
-        p_excl = self.calc_probs(rule.target_excl_overlap[excl_bi_array])
+        p_excl = self.calc_probs(rule.target_excl[excl_bi_array])
         p_incl = self.calc_probs(rule.target[incl_bi_array])
 
         modelling_groups = ruleset.modelling_groups
@@ -158,7 +157,7 @@ class NMLencoding(DataEncoding):
 
         new_else_bool = np.zeros(self.data_info.nrow, dtype=bool)
         new_else_bool[ruleset.uncovered_indices] = True
-        new_else_bool[rule.indices_excl_overlap[excl_bi_array]] = False
+        new_else_bool[rule.indices_excl[excl_bi_array]] = False
         new_else_coverage = np.count_nonzero(new_else_bool)
         new_else_p = self.calc_probs(self.data_info.target[new_else_bool])
 

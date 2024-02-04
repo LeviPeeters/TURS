@@ -26,7 +26,7 @@ def make_rule_from_grow_info(grow_info):
 
     rule = grow_info["_rule"]
     indices = rule.indices[grow_info["incl_bi_array"]]
-    indices_excl_overlap = rule.indices_excl_overlap[grow_info["excl_bi_array"]]
+    indices_excl = rule.indices_excl[grow_info["excl_bi_array"]]
 
     # Update the condition matrix
     condition_matrix = np.array(rule.condition_matrix)
@@ -39,10 +39,10 @@ def make_rule_from_grow_info(grow_info):
         new_icols_in_order = rule.icols_in_order + [grow_info["icol"]]
 
 
-    rule = Rule(indices=indices, indices_excl_overlap=indices_excl_overlap, data_info=rule.data_info,
+    rule = Rule.Rule(indices=indices, indices_excl=indices_excl, data_info=rule.data_info,
                 rule_base=rule, condition_matrix=condition_matrix, ruleset=rule.ruleset,
-                excl_mdl_gain=grow_info["excl_mdl_gain"],
-                incl_mdl_gain=grow_info["incl_mdl_gain"],
+                mdl_gain_excl=grow_info["excl_mdl_gain"],
+                mdl_gain=grow_info["incl_mdl_gain"],
                 icols_in_order=new_icols_in_order)
     return rule
 
@@ -128,7 +128,7 @@ class Ruleset:
         self.cl_data, self.allrules_cl_data = \
             self.data_encoding.update_ruleset_and_get_cl_data_ruleset_after_adding_rule(ruleset=self, rule=rule)
         self.cl_model = \
-            self.model_encoding.cl_model_after_growing_rule_on_icol(rule=rule, ruleset=self, icol=None, cut_option=None)
+            self.model_encoding.cl_model_after_growing_rule(rule=rule, ruleset=self, icol=None, cut_option=None)
 
         # Update total codelength
         self.total_cl = self.cl_data + self.cl_model
@@ -153,19 +153,41 @@ class Ruleset:
         self.else_rule_negloglike = utils_calculating_cl.calc_negloglike(self.else_rule_p, self.else_rule_coverage)
 
     def get_negloglike_all_modelling_groups(self, rule):
-        """ Calculate the negative log-likelihood of the modelling groups for a given rule
+        """ Calculate the total negative log-likelihood of all rules when adding a new rule
         
         Parameters
         ---
         rule : Rule object
-            Rule for which the negative log-likelihood of the modelling groups is calculated
+            Rule to be added
             
         Returns
         ---
         negloglike : float
             Summed negative log-likelihood of all modelling groups for the given rule
         """
-        pass
+        all_mg_negloglike = []
+        if len(self.modelling_groups) == 0:
+            mg = ModellingGroup.ModellingGroup(data_info=self.data_info, bool_cover=rule.bool_array,
+                                bool_use_for_model=rule.bool_array,
+                                rules_involved=[0], prob_model=rule.prob,
+                                prob_cover=rule.prob)
+            all_mg_negloglike.append(mg.negloglike)
+            self.modelling_groups.append(mg)
+        else:
+            for m in self.modelling_groups:
+                evaluate_res = m.evaluate_rule(rule, update_rule_index=len(self.rules) - 1)
+                all_mg_negloglike.append(evaluate_res[0])
+                if evaluate_res[1] is not None:
+                    self.modelling_groups.append(evaluate_res[1])
+
+            mg = ModellingGroup.ModellingGroup(data_info=self.data_info,
+                                bool_cover=rule.bool_array_excl,
+                                bool_use_for_model=rule.bool_array,
+                                rules_involved=[len(self.rules) - 1], prob_model=rule.prob,
+                                prob_cover=rule.prob_excl)
+            all_mg_negloglike.append(mg.negloglike)
+            self.modelling_groups.append(mg)
+        return np.sum(all_mg_negloglike)
 
     def fit(self, max_iter=1000, printing=True):
         """ Fit the data by iteratively adding rules to the ruleset
@@ -194,8 +216,7 @@ class Ruleset:
             # Grow a rule
             rule_to_add = self.search_next_rule(k_consecutively=5)
 
-            # Question: Why is the criterion gain per uncovered coverage? 
-            # The algorithm says the gain is the criterion, and we do a diversity check
+            # 
             if rule_to_add.incl_gain_per_excl_coverage > 0:
                 self.add_rule(rule_to_add)
                 total_cl.append(self.total_cl)
@@ -295,7 +316,7 @@ class Ruleset:
 
     def search_next_rule(self, 
                          k_consecutively, 
-                         rule_given: Rule.Rule = None
+                         rule_given = None
                          ):
         """ Execute a beam search to find the next rule to add to the ruleset
         
@@ -312,7 +333,7 @@ class Ruleset:
             Rule found by the beam search
         """
         if rule_given is None:
-            rule = Rule(indices=np.arange(self.data_info.nrow), 
+            rule = Rule.Rule(indices=np.arange(self.data_info.nrow), 
                         indices_excl=self.uncovered_indices,
                         data_info=self.data_info, 
                         rule_base=None,
@@ -330,7 +351,6 @@ class Ruleset:
         previous_best_gain, previous_best_excl_gain = -np.Inf, -np.Inf
         counter_worse_best_gain = 0
 
-        # TODO: Figure out what max_grow_iter is
         for i in range(self.data_info.max_grow_iter):
             excl_beam_list, incl_beam_list = [], []
 

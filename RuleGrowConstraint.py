@@ -70,7 +70,7 @@ def check_split_validity(rule, icol, cut):
     # The extra model code length this split would add
     cl_model_extra = rule.ruleset.model_encoding.cached_cl_model["l_cut"][0][icol]  # 0 represents for the "one split cut", instead of "two-splits cut"
     cl_model_extra += np.log2(rule.ruleset.model_encoding.data_ncol_for_encoding)
-    num_vars = np.sum(rule.condition_count > 0)
+    num_vars = np.sum(rule.condition_bool > 0)
     cl_model_extra += rule.ruleset.model_encoding.cached_cl_model["l_number_of_variables"][num_vars + 1] - \
                       rule.ruleset.model_encoding.cached_cl_model["l_number_of_variables"][num_vars]
 
@@ -101,7 +101,7 @@ def check_split_validity_excl(rule, icol, cut):
     : bool
         Whether the split is valid
     """
-    indices_left, indices_right = rule.indices_excl[rule.features_excl[:, icol] < cut], rule.indices_excl[rule.features[:, icol] >= cut]
+    indices_left, indices_right = rule.indices_excl[rule.features_excl[:, icol] < cut], rule.indices_excl[rule.features_excl[:, icol] >= cut]
 
     # Compute probabilities for the coverage of the rule and both sides of the split
     p_rule = rule.prob_excl
@@ -116,7 +116,7 @@ def check_split_validity_excl(rule, icol, cut):
     # The extra model code length this split would add
     cl_model_extra = rule.ruleset.model_encoding.cached_cl_model["l_cut"][0][icol]  # 0 represents for the "one split cut", instead of "two-splits cut"
     cl_model_extra += np.log2(rule.ruleset.model_encoding.data_ncol_for_encoding)
-    num_vars = np.sum(rule.condition_count > 0)
+    num_vars = np.sum(rule.condition_bool > 0)
     cl_model_extra += rule.ruleset.model_encoding.cached_cl_model["l_number_of_variables"][num_vars + 1] - \
                       rule.ruleset.model_encoding.cached_cl_model["l_number_of_variables"][num_vars]
 

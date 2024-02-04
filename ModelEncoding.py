@@ -21,7 +21,6 @@ class ModelEncodingDependingOnData:
     def cache_cl_model(self, data_ncol, max_rule_length, candidate_cuts):
         """ Precompute certain code length values we'll need often
         For number of variables, number of rules, number of cuts and selection of variables
-        TODO: review. I'm not sure about this description. 
 
         Parameters
         ---
@@ -40,7 +39,7 @@ class ModelEncodingDependingOnData:
         # Code Length contributed by the number of variables in a rule (one per literal)
         l_number_of_variables = [utils_modelencoding.universal_code_integers(i) for i in range(max(data_ncol-1, max_rule_length))]
         
-        # Question: why is this here
+        # Code Length contributed to specify which variables are used in a rule
         l_which_variables = utils_modelencoding.log2comb(data_ncol, np.arange(max(data_ncol-1, max_rule_length)))
 
         # Code Length contributed by the number of rules in the ruleset
@@ -75,7 +74,7 @@ class ModelEncodingDependingOnData:
     
     def rule_cl_model(self, condition_count):
         """ Retrieve the code length of a rule using the precomputed values in the cache.
-        TODO: Remove, because it's not actually used. Keep it for now because it helps my understanding
+        TODO: I'm not convinced it's worse to use this compared to rule_cl_model_dep.
 
         Parameters
         ---
@@ -180,7 +179,7 @@ class ModelEncodingDependingOnData:
         # This should never happen, but TURS2 has code to catch this occurence so I'll check for it
         assert rule is not None, "Rule is None when computing model code length after growing"
 
-        condition_count = np.array(rule.condition_count)
+        condition_count = np.array(rule.condition_bool)
         icols_in_order = rule.icols_in_order
         condition_matrix = np.array(rule.condition_matrix)
 

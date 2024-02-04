@@ -60,7 +60,7 @@ class DataInfo:
         self.cached_number_of_rules_for_cl_model = self.alg_config.max_grow_iter
         
         # TODO: There is a bunch of code in TURS2 for logging the learning process, which I can't get to work
-
+        self.log_learning_process = False #self.alg_config.log_learning_process
 
     
     def candidate_cuts_quantile_midpoints(self, num_candidate_cuts):

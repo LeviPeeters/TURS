@@ -6,7 +6,6 @@ import utils_readable
 import Beam
 import RuleGrowConstraint
 import DataInfo
-import Ruleset
 
 import constant
 
@@ -31,7 +30,7 @@ class Rule:
                  data_info: DataInfo.DataInfo,
                  rule_base, 
                  condition_matrix, 
-                 ruleset: Ruleset.Ruleset,
+                 ruleset,
                  mdl_gain, 
                  mdl_gain_excl, 
                  icols_in_order):
@@ -64,15 +63,25 @@ class Rule:
         self.condition_bool = (~np.isnan(condition_matrix[0])).astype(int) + (~np.isnan(condition_matrix[1])).astype(int)
 
         # Probabilities and regrets
-        self.prob_excl = self._calc_probs(target=self.target_excl_overlap)
+        self.prob_excl = self._calc_probs(target=self.target_excl)
         self.prob = self._calc_probs(target=self.target)
-        self.regret_excl = nml_regret.regret(self.nrow_excl, data_info.num_class)
-        self.regret = nml_regret.regret(self.nrow, data_info.num_class)
+        self.regret_excl = nml_regret.regret(len(self.indices_excl), data_info.num_class)
+        self.regret = nml_regret.regret(len(self.indices), data_info.num_class)
         self.negloglike_excl = utils_calculating_cl.calc_negloglike(p=self.prob_excl, n=len(self.indices_excl))
         self.cl_model = self.ruleset.model_encoding.rule_cl_model_dep(self.condition_matrix, col_orders=icols_in_order)
 
         self.mdl_gain = mdl_gain
         self.mdl_gain_excl = mdl_gain_excl
+
+        if self.rule_base is None:
+            self.incl_mdl_gain, self.excl_mdl_gain = -np.Inf, -np.Inf
+            self.incl_gain_per_excl_coverage, self.excl_gain_per_excl_coverage = -np.Inf, -np.Inf
+        else:
+            self.incl_mdl_gain, self.excl_mdl_gain = mdl_gain, mdl_gain_excl
+            if self.coverage_excl == 0:
+                self.incl_gain_per_excl_coverage, self.excl_gain_per_excl_coverage = np.nan, np.nan
+            else:
+                self.incl_gain_per_excl_coverage, self.excl_gain_per_excl_coverage = mdl_gain / self.coverage_excl, mdl_gain_excl / self.coverage_excl
 
 
     def _calc_probs(self, target):
@@ -231,7 +240,7 @@ class Rule:
                 excl_left_coverage, excl_right_coverage = np.count_nonzero(excl_left_bi_array), np.count_nonzero(
                     excl_right_bi_array)
 
-                # QUESTION: Why is there no check on incl_coverage being 0?
+                # Question: Why is there no check on incl_coverage being 0?
                 if excl_left_coverage == 0 or excl_right_coverage == 0:
                     continue
 
@@ -270,7 +279,7 @@ class Rule:
         """
         data_encoding, model_encoding = self.ruleset.data_encoding, self.ruleset.model_encoding
 
-        cl_model = model_encoding.cl_model_after_growing_rule_on_icol(rule=self, ruleset=self.ruleset, icol=icol,
+        cl_model = model_encoding.cl_model_after_growing_rule(rule=self, ruleset=self.ruleset, icol=icol,
                                                                       cut_option=cut_option)
         cl_data = data_encoding.get_cl_data_incl(self.ruleset, self, excl_bi_array=excl_bi_array, incl_bi_array=bi_array)
         cl_data_excl = data_encoding.get_cl_data_excl(self.ruleset, self, excl_bi_array)
