@@ -1,11 +1,13 @@
 import sys
 import os
+import pdb
 
 import numpy as np
 import pandas as pd
 import copy
 import time
 from datetime import datetime
+from guppy import hpy
 
 from sklearn.model_selection import StratifiedKFold
 
@@ -19,6 +21,8 @@ import utils_readable
 import utils_namedtuple
 
 np.seterr(all='raise')
+
+h = hpy()
 
 exp_res_alldata = []
 date_and_time = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -71,6 +75,7 @@ for fold in range(5):
     data_encoding = DataEncoding.NMLencoding(data_info)
     model_encoding = ModelEncoding.ModelEncodingDependingOnData(data_info)
     ruleset = Ruleset.Ruleset(data_info=data_info, data_encoding=data_encoding, model_encoding=model_encoding)
+
     ruleset.fit(max_iter=1000, printing=True)
     utils_readable.get_readable_rules(ruleset)
 
@@ -81,6 +86,8 @@ for fold in range(5):
     exp_res_alldata.append(exp_res)
 
 exp_res_df = pd.DataFrame(exp_res_alldata)
+
+print(h.heap())
 
 folder_name = "exp_uci_" + date_and_time[:8]
 os.makedirs(folder_name, exist_ok=True)

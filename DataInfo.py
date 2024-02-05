@@ -86,8 +86,9 @@ class DataInfo:
         for i, feature in enumerate(self.features.T):
             unique_feature = np.unique(feature)
             if len(unique_feature) <= 1:
-                # TODO: I think this should never happen
-                print("feature with only one value detected!")
+                # This can happen because of cross-validation
+                candidate_cut_this_dimension = np.array([], dtype=float)
+                candidate_cuts[i] = candidate_cut_this_dimension
             elif np.array_equal(unique_feature, np.array([0, 1])):
                 # Binary feature only has one cut
                 candidate_cuts[i] = np.array([0.5])

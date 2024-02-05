@@ -124,7 +124,6 @@ class Ruleset:
         # Append the rule
         self.rules.append(rule)
         
-        # 
         self.cl_data, self.allrules_cl_data = \
             self.data_encoding.update_ruleset_and_get_cl_data_ruleset_after_adding_rule(ruleset=self, rule=rule)
         self.cl_model = \
@@ -165,6 +164,7 @@ class Ruleset:
         negloglike : float
             Summed negative log-likelihood of all modelling groups for the given rule
         """
+        
         all_mg_negloglike = []
         if len(self.modelling_groups) == 0:
             mg = ModellingGroup.ModellingGroup(data_info=self.data_info, bool_cover=rule.bool_array,
@@ -174,7 +174,9 @@ class Ruleset:
             all_mg_negloglike.append(mg.negloglike)
             self.modelling_groups.append(mg)
         else:
-            for m in self.modelling_groups:
+            num_mgs = len(self.modelling_groups)
+            for jj in range(num_mgs):
+                m = self.modelling_groups[jj]
                 evaluate_res = m.evaluate_rule(rule, update_rule_index=len(self.rules) - 1)
                 all_mg_negloglike.append(evaluate_res[0])
                 if evaluate_res[1] is not None:
@@ -218,6 +220,7 @@ class Ruleset:
 
             # 
             if rule_to_add.incl_gain_per_excl_coverage > 0:
+                print("Found rule with gain: ", rule_to_add.incl_gain_per_excl_coverage)
                 self.add_rule(rule_to_add)
                 total_cl.append(self.total_cl)
                 if self.data_info.log_learning_process:
@@ -352,6 +355,7 @@ class Ruleset:
         counter_worse_best_gain = 0
 
         for i in range(self.data_info.max_grow_iter):
+            print("     SearchNextRule Iteration: ", i)
             excl_beam_list, incl_beam_list = [], []
 
             # For each rule, initialize a beam and put information for a grow step in it
@@ -371,13 +375,14 @@ class Ruleset:
                 final_incl_beam.update(info, info["normalized_gain_incl"])
             for info in final_info_excl:
                 final_excl_beam.update(info, info["normalized_gain_excl"])
-            
+
             # If the beams are empty, stop the search
             if len(final_incl_beam.gains) == 0 and len(final_excl_beam.gains) == 0:
                 break
-            
+
             # If the stop condition is met, increment the counter
             stop_condition_element = self.calculate_stop_condition_element(final_incl_beam, final_excl_beam, previous_best_gain, previous_best_excl_gain)
+            
             if stop_condition_element:
                 counter_worse_best_gain = counter_worse_best_gain + 1
             else:
@@ -396,5 +401,6 @@ class Ruleset:
                 rules_for_next_iter = extract_rules_from_beams([final_excl_beam, final_incl_beam])
                 rules_candidates.extend(rules_for_next_iter)
 
+        print("     SearchNextRule End") 
         which_best_ = np.argmax([r.incl_gain_per_excl_coverage for r in rules_candidates])
         return rules_candidates[which_best_]

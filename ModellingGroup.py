@@ -138,7 +138,7 @@ class ModellingGroup:
                 new_mg = ModellingGroup(data_info=self.data_info,
                                         bool_cover=rule_and_mg_covering_bool,
                                         bool_use_for_model=rule_and_mg_modeling_bool,
-                                        rules_involved=self.rules_involvde + [update_rule_index],
+                                        rules_involved=self.rules_involved + [update_rule_index],
                                         prob_model=rule_and_mg_modelling_p,
                                         prob_cover=rule_and_mg_covering_p)
                 return [rule_and_mg_negloglike + nonRule_and_mg_negloglike, new_mg]
