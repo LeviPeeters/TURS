@@ -1,5 +1,9 @@
 # Experiment results
 exp_uci*
+logs/*
+
+# graphs and figures
+*.png
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

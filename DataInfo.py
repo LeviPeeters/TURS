@@ -19,6 +19,7 @@ class DataInfo:
                 log_learning_process=False,
                 dataset_name=None,
                 feature_names=["X" + str(i) for i in range(X.shape[1])],
+                label_names=np.unique(y),
                 validity_check="either"
             )
         else:
@@ -44,6 +45,7 @@ class DataInfo:
         self.dataset_name = self.alg_config.dataset_name
         self.num_candidate_cuts = self.alg_config.num_candidate_cuts
         self.nrow, self.ncol = X.shape[0], X.shape[1]
+        self.log_learning_process = self.alg_config.log_learning_process
 
         # get num_class, ncol, nrow,
         self.num_class = len(np.unique(self.target))
@@ -59,8 +61,15 @@ class DataInfo:
         # TODO: what does this do
         self.cached_number_of_rules_for_cl_model = self.alg_config.max_grow_iter
         
-        # TODO: There is a bunch of code in TURS2 for logging the learning process, which I can't get to work
-        self.log_learning_process = False #self.alg_config.log_learning_process
+        if self.alg_config.log_learning_process:
+            time = datetime.now().strftime("%Y-%m-%d_%H-%M")
+            if self.alg_config.log_folder_name:
+                os.mkdir(f"logs/{self.alg_config.log_folder_name}")
+                self.logfile = open(f"logs/{self.alg_config.log_folder_name}/log.txt", "a")
+            else:
+                os.mkdir(f"logs/{time}")
+                self.logfile = open(f"logs/{time}/log.txt", "a")
+            self.logfile.write(f"Log for learning process at {time}\n")
 
     
     def candidate_cuts_quantile_midpoints(self, num_candidate_cuts):

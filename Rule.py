@@ -2,7 +2,6 @@ import numpy as np
 
 import utils_calculating_cl
 import nml_regret
-import utils_readable
 import Beam
 import RuleGrowConstraint
 import DataInfo
@@ -290,8 +289,8 @@ class Rule:
         return {"cl_model": cl_model, "cl_data": cl_data, "cl_data_excl": cl_data_excl,
                 "absolute_gain": absolute_gain, "absolute_gain_excl": absolute_gain_excl}
 
-    def _print(self):
-        """ Print the rule.
+    def __str__(self):
+        """ String representation of the rule for printing
         
         Parameters
         ---
@@ -302,4 +301,51 @@ class Rule:
         readable : str
             String representation of the rule
         """
-        pass
+        """ This function prints a rule in a readable way.
+        TODO: Use proper column names
+        
+        Parameters
+        ---
+        rule : Rule
+            The rule to be printed.
+        
+        Returns
+        ---
+        : String
+            The rule in a readable way.
+        """
+        feature_names = self.ruleset.data_info.feature_names
+        label_names = self.ruleset.data_info.alg_config.label_names
+        readable = ""
+        which_variables = np.where(self.condition_bool != 0)[0]
+        if len(which_variables) == 0:
+            return "Empty rule"
+
+        for v in which_variables:
+            cut = self.condition_matrix[:, v][::-1]
+            icol_name = str(feature_names[v])
+            if np.isnan(cut[0]):
+                if cut[1] == 0.5 and len(self.data_info.candidate_cuts[v]) == 1:
+                    cut_condition = f"([binary]) {icol_name} = 0;    "
+                else:
+                    cut_condition = f"{icol_name} < {round(cut[1], 2)};    "
+            elif np.isnan(cut[1]):
+                if cut[0] == 0.5 and len(self.data_info.candidate_cuts[v]) == 1:
+                    cut_condition = f"([binary]) {icol_name} = 1;    "
+                else:
+                    cut_condition = f"{icol_name} >= {round(cut[0], 2)};    "
+            else:
+                cut_condition = f"{round(cut[0], 2)} <= {icol_name} < {round(cut[1], 2)};    "
+            readable += cut_condition
+        readable += "\n"
+        readable = f"If {readable}"
+
+        readable += "Then:\n"
+        if len(self.prob) > 5:
+            readable += f"Highest probability is {max(self.prob)} for outcome {label_names[np.argmax(self.prob)]}"
+        else:
+            for i in range(len(label_names)):
+                readable += f"Probability of {label_names[i]} is {round(self.prob[i], 2)}\n"
+        readable += f"Coverage of this rule: {self.coverage}\n"
+
+        return readable

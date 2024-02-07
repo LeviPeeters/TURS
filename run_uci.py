@@ -17,12 +17,13 @@ import ModelEncoding
 import DataEncoding
 
 import exp_predictive_perf
-import utils_readable 
 import utils_namedtuple
+import utils
 
 np.seterr(all='raise')
 
 h = hpy()
+make_call_graph = True
 
 exp_res_alldata = []
 date_and_time = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -38,8 +39,7 @@ else:
     fold_given = 0
 
 d = exp_predictive_perf.read_data(data_name)
-d = exp_predictive_perf.preprocess_data(d)
-
+d, class_labels = exp_predictive_perf.preprocess_data(d)
 
 X = d.iloc[:, :d.shape[1] - 1].to_numpy()
 y = d.iloc[:, d.shape[1] - 1].to_numpy()
@@ -65,19 +65,46 @@ for fold in range(5):
     alg_config = utils_namedtuple.AlgConfig(
         num_candidate_cuts=20, max_num_rules=500, max_grow_iter=500, num_class_as_given=None,
         beam_width=10,
-        log_learning_process=False,
+        log_learning_process=True,
+        log_folder_name=datetime.now().strftime("%Y%m%d_%H%M") + "_" + data_name,
         dataset_name=None,
         feature_names=d.columns[:-1],
+        label_names=class_labels,
         validity_check="either"
         )
     data_info = DataInfo.DataInfo(X=X_train, y=y_train, beam_width=None, alg_config=alg_config)
 
     data_encoding = DataEncoding.NMLencoding(data_info)
     model_encoding = ModelEncoding.ModelEncodingDependingOnData(data_info)
-    ruleset = Ruleset.Ruleset(data_info=data_info, data_encoding=data_encoding, model_encoding=model_encoding)
+    ruleset = Ruleset.Ruleset(
+        data_info=data_info, 
+        data_encoding=data_encoding, 
+        model_encoding=model_encoding
+    )
 
-    ruleset.fit(max_iter=1000, printing=True)
-    utils_readable.get_readable_rules(ruleset)
+    if make_call_graph:
+        custom_include = [
+            "Beam.*",
+            "exp_utils.*",
+            "ModellingGroup.*",
+            "nml_regret.*",
+            "Rule.*",
+            "RuleGrowConstraint.*",
+            "utils_modelencoding.*",
+            "utils_namedtuple.*",
+            "utils_predict.*",
+            "Ruleset.*", 
+            "ModelEncoding.*", 
+            "DataEncoding.*", 
+            "DataInfo.*", 
+            "utils_calculating_cl.*",  
+            "exp_predictive_perf.*",
+            "run_uci.*",
+        ]
+        utils.call_graph_filtered(ruleset.fit, "call_graph.png", custom_include=custom_include)
+    else:
+        ruleset.fit(max_iter=1000, printing=True)
+    print(ruleset)
 
     end_time = time.time()
 
@@ -86,8 +113,6 @@ for fold in range(5):
     exp_res_alldata.append(exp_res)
 
 exp_res_df = pd.DataFrame(exp_res_alldata)
-
-print(h.heap())
 
 folder_name = "exp_uci_" + date_and_time[:8]
 os.makedirs(folder_name, exist_ok=True)

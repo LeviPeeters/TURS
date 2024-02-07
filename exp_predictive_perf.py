@@ -108,6 +108,7 @@ def preprocess_data(d):
 
     le = LabelEncoder()
     d.iloc[:, -1] = le.fit_transform(d.iloc[:, -1])
+    unique_labels = le.classes_
 
     ohe = OneHotEncoder(sparse_output=False, dtype=np.int, drop="if_binary")#, feature_name_combiner="concat")
     col_names = d.columns
@@ -136,7 +137,7 @@ def preprocess_data(d):
     # Add the labels to the preprocessed dataframe
     d = pd.concat([d_feature, d.iloc[:, -1]], axis=1)
 
-    return d
+    return d, unique_labels
 
 def calculate_roc_auc_logloss(ruleset, y_test, y_pred_prob, y_train, y_pred_prob_train):
     """ Calculate various evaluation metrics using sklearn 

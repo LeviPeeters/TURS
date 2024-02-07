@@ -1,10 +1,11 @@
 import numpy as np
+import os
+from datetime import datetime
 
 import Rule
 import Beam
 import ModellingGroup
 import DataInfo
-import utils_readable
 import utils_predict
 import utils_calculating_cl
 import ModelEncoding
@@ -81,8 +82,6 @@ class Ruleset:
                  data_encoding: DataEncoding.NMLencoding,
                  model_encoding: ModelEncoding.ModelEncodingDependingOnData,
                  constraints = None):
-        
-        self.log_folder_name = None
 
         self.data_info = data_info
         self.model_encoding = model_encoding
@@ -112,6 +111,8 @@ class Ruleset:
             self.constraints = {}
         else:
             self.constraints = constraints
+        
+        
 
     def add_rule(self, rule):
         """ Add a rule to the ruleset and update code length accordingly
@@ -213,25 +214,31 @@ class Ruleset:
 
         for iter in range(max_iter):
             if printing:
-                print("Iteration: ", iter)
+                print(f"Iteration: {iter}", end="\r")
+
+            if self.data_info.log_learning_process:
+                self.data_info.logfile.write("--------------------\n")
+                self.data_info.logfile.write(f"Iteration {iter}\n")
+                self.data_info.logfile.write("--------------------\n")
             
             # Grow a rule
             rule_to_add = self.search_next_rule(k_consecutively=5)
 
             # 
             if rule_to_add.incl_gain_per_excl_coverage > 0:
-                print("Found rule with gain: ", rule_to_add.incl_gain_per_excl_coverage)
                 self.add_rule(rule_to_add)
                 total_cl.append(self.total_cl)
                 if self.data_info.log_learning_process:
-                    # TODO
-                    pass
+                    self.data_info.logfile.write(f"Added the following rule to the ruleset:\n")
+                    self.data_info.logfile.write(str(rule_to_add))
             else:
                 break
 
         if self.data_info.log_learning_process:
-            # TODO
-            pass
+            self.data_info.logfile.write(f"Finished learning process at {datetime.now().strftime('%Y-%m-%d_%H-%M')}\n")
+            self.data_info.logfile.write(f"Final ruleset is: \n")
+            self.data_info.logfile.write(str(self))
+            self.data_info.logfile.close()
     
         return total_cl
 
@@ -355,7 +362,11 @@ class Ruleset:
         counter_worse_best_gain = 0
 
         for i in range(self.data_info.max_grow_iter):
-            print("     SearchNextRule Iteration: ", i)
+            if self.data_info.log_learning_process:
+                self.data_info.logfile.write(f"    Grow iteration {i}\n")
+                self.data_info.logfile.write(f"    Number of rules for this iteration: {len(rules_for_next_iter)}\n")
+                self.data_info.logfile.write(f"    Total number of candidates: {len(rules_candidates)}\n")
+
             excl_beam_list, incl_beam_list = [], []
 
             # For each rule, initialize a beam and put information for a grow step in it
@@ -401,6 +412,33 @@ class Ruleset:
                 rules_for_next_iter = extract_rules_from_beams([final_excl_beam, final_incl_beam])
                 rules_candidates.extend(rules_for_next_iter)
 
-        print("     SearchNextRule End") 
         which_best_ = np.argmax([r.incl_gain_per_excl_coverage for r in rules_candidates])
         return rules_candidates[which_best_]
+
+    def __str__(self):
+        """ This function prints a ruleset in a readable way.
+    
+        Parameters
+        ---
+        ruleset : RuleSet
+            The ruleset to be printed.
+        
+        Returns
+        ---
+        None
+        """
+        readable = ""
+        label_names = self.data_info.alg_config.label_names
+        for rule in self.rules:
+            readable += str(rule)
+            readable += "\n"
+        readable += "If none of above,\n"
+        readable += "Then:\n"
+        if len(self.else_rule_p) > 5:
+            readable += f"Highest probability is {max(self.else_rule_p)} for outcome {label_names[np.argmax(self.else_rule_p)]}"
+        else:
+            for i in range(len(label_names)):
+                readable += f"Probability of {label_names[i]} is {round(self.else_rule_p[i], 2)}\n"
+        readable += f"Coverage of the else rule: {self.else_rule_coverage}\n"
+
+        return readable
