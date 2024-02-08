@@ -47,6 +47,19 @@ class DataInfo:
         self.nrow, self.ncol = X.shape[0], X.shape[1]
         self.log_learning_process = self.alg_config.log_learning_process
 
+        # Make a dictionary of categorical features and their possible values
+        self.categorical_features = {}
+        for name in self.feature_names:
+            try:
+                feature, value = name.split("_")
+            except ValueError:
+                pass
+            else:
+                if feature not in self.categorical_features:
+                    self.categorical_features[feature] = [value]
+                else:
+                    self.categorical_features[feature].append(value)
+
         # get num_class, ncol, nrow,
         self.num_class = len(np.unique(self.target))
         if self.alg_config.num_class_as_given is not None:
@@ -61,6 +74,7 @@ class DataInfo:
         # TODO: what does this do
         self.cached_number_of_rules_for_cl_model = self.alg_config.max_grow_iter
         
+        # Set up a logging file 
         if self.alg_config.log_learning_process:
             time = datetime.now().strftime("%Y-%m-%d_%H-%M")
             if self.alg_config.log_folder_name:
@@ -69,7 +83,13 @@ class DataInfo:
             else:
                 os.mkdir(f"logs/{time}")
                 self.logfile = open(f"logs/{time}/log.txt", "a")
+
+            # Write the configuration to the log file
             self.logfile.write(f"Log for learning process at {time}\n")
+            self.logfile.write(f"Algorithm Configuration:")
+            for key, value in self.alg_config._asdict().items():
+                if key != "feature_names":
+                    self.logfile.write(f"{key}: {value}\n")
 
     
     def candidate_cuts_quantile_midpoints(self, num_candidate_cuts):

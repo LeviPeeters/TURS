@@ -56,6 +56,9 @@ def read_data(data_name):
 
     if data_name in datasets_without_header_row:
         d = pd.read_csv(data_path, header=None)
+        features = [f"X{i}" for i in range(d.shape[1] - 1)]
+        features.append("y")
+        d.columns = features
     elif data_name in datasets_with_header_row:
         d = pd.read_csv(data_path)
     elif data_name in Locatus_data:
@@ -92,6 +95,7 @@ def read_data(data_name):
 def preprocess_data(d):
     """ Use a LabelEncoder to encode the labels and a OneHotEncoder to encode categorical features 
     Assumes that the labels are in the last column of the dataframe
+    Columns with dtype float or int are left intact, columns with dtype str are one-hot encoded
     
     Parameters
     ---
@@ -114,12 +118,8 @@ def preprocess_data(d):
     col_names = d.columns
 
     for icol in range(d.shape[1] - 1):
-        if d.iloc[:, icol].dtype == "float":
-            # Float features are left intact
-            d_transformed = d.iloc[:, icol]
-            d_transformed.columns = [col_names[icol]]
-        elif d.iloc[:, icol].dtype == "int" and len(np.unique(d.iloc[:, icol])) > 20:
-            # TODO: Why the condition on number of unique values?
+        if d.iloc[:, icol].dtype == "float" or d.iloc[:, icol].dtype == "int":
+            # Numerical features are left intact
             d_transformed = d.iloc[:, icol]
             d_transformed.columns = [col_names[icol]]
         else:

@@ -291,6 +291,7 @@ class Rule:
 
     def __str__(self):
         """ String representation of the rule for printing
+        Should print categorical features in a more readable way
         
         Parameters
         ---
@@ -301,44 +302,62 @@ class Rule:
         readable : str
             String representation of the rule
         """
-        """ This function prints a rule in a readable way.
-        TODO: Use proper column names
-        
-        Parameters
-        ---
-        rule : Rule
-            The rule to be printed.
-        
-        Returns
-        ---
-        : String
-            The rule in a readable way.
-        """
         feature_names = self.ruleset.data_info.feature_names
         label_names = self.ruleset.data_info.alg_config.label_names
-        readable = ""
+        readable = "If: "
         which_variables = np.where(self.condition_bool != 0)[0]
+
+        # We keep track of all negations, because we need to do some logic to print them correctly
+        negations = {}
+
         if len(which_variables) == 0:
             return "Empty rule"
 
         for v in which_variables:
             cut = self.condition_matrix[:, v][::-1]
             icol_name = str(feature_names[v])
-            if np.isnan(cut[0]):
-                if cut[1] == 0.5 and len(self.data_info.candidate_cuts[v]) == 1:
-                    cut_condition = f"([binary]) {icol_name} = 0;    "
+
+            # If we can split the feature name, it is categorical
+            try:
+                feature_name, value_name = icol_name.split("_")
+
+            except ValueError:
+                feature_name = icol_name
+                value_name = None
+            
+            # For numerical features, we can just print the literal
+            if value_name is None:
+                if np.isnan(cut[0]):
+                    readable += f"{icol_name} < {round(cut[1], 2)};    "
+                elif np.isnan(cut[1]):
+                    readable += f"{icol_name} >= {round(cut[0], 2)};    "
                 else:
-                    cut_condition = f"{icol_name} < {round(cut[1], 2)};    "
-            elif np.isnan(cut[1]):
-                if cut[0] == 0.5 and len(self.data_info.candidate_cuts[v]) == 1:
-                    cut_condition = f"([binary]) {icol_name} = 1;    "
-                else:
-                    cut_condition = f"{icol_name} >= {round(cut[0], 2)};    "
+                    readable += f"{round(cut[0], 2)} <= {icol_name} < {round(cut[1], 2)};    "
+            
+            # For categorical features, we need to do a bit more work
             else:
-                cut_condition = f"{round(cut[0], 2)} <= {icol_name} < {round(cut[1], 2)};    "
-            readable += cut_condition
+                # if cut[1] is nan, it means the feature is 1, so the feature is equal to the value
+                # Because one rule can't contain two values for one feature, we can print the literal as feature == value 
+                if np.isnan(cut[1]):
+                    readable += f"[b] {feature_name} == {value_name};    "
+                
+                # If cut[0] is nan, it means the feature is 0, so the feature is not equal to the value
+                # In this case, we need to decide if it is more readable to print which values it CAN be, or which values it CAN'T be
+                # To do so, we need to know all negations in this rule
+                else:
+                    if feature_name not in negations:
+                        negations[feature_name] = [value_name]
+                    else:
+                        negations[feature_name].append(value_name)
+       
+        # Now we deal with the negations
+        for feature, values in negations.items():
+            if len(values) < len(self.ruleset.data_info.categorical_features[feature]) / 2:
+                readable += f"{feature} != {', '.join(values)};    "
+            else:
+                readable += f"{feature} == {', '.join([v for v in self.ruleset.data_info.categorical_features[feature] if v not in values])};    "
+
         readable += "\n"
-        readable = f"If {readable}"
 
         readable += "Then:\n"
         if len(self.prob) > 5:
