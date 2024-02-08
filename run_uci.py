@@ -65,11 +65,13 @@ for fold in range(5):
     alg_config = utils_namedtuple.AlgConfig(
         num_candidate_cuts=20, max_num_rules=500, max_grow_iter=500, num_class_as_given=None,
         beam_width=10,
-        log_learning_process=True,
+        log_learning_process=False,
         log_folder_name=datetime.now().strftime("%Y%m%d_%H%M") + "_" + data_name,
         dataset_name=None,
         feature_names=d.columns[:-1],
         label_names=class_labels,
+        which_features=None,
+        random_seed=None,
         validity_check="either"
         )
     data_info = DataInfo.DataInfo(X=X_train, y=y_train, beam_width=None, alg_config=alg_config)

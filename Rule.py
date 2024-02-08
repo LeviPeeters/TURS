@@ -140,7 +140,7 @@ class Rule:
         return candidate_cuts_icol
 
     def update_grow_beam(self, bi_array, excl_bi_array, icol, cut, cut_option, incl_coverage, excl_coverage,
-                         grow_info_beam: Beam.GrowInfoBeam, grow_info_beam_excl: Beam.GrowInfoBeam, _validity):
+                         grow_info_beam: Beam.GrowInfoBeam, incl_or_excl, _validity):
         """ Use information of a grow step to update the beam.
 
         Parameters
@@ -187,17 +187,16 @@ class Rule:
 
         # Ratio of coverage after the grow step to the coverage of the rule before the grow step
         # This is the gain of the grow step
-        excl_cov_percent = grow_info["coverage_excl"] / self.coverage_excl
-        incl_cov_percent = grow_info["coverage_incl"] / self.coverage
+        if incl_or_excl == "incl":
+            cov_percent = grow_info[f"coverage_incl"] / self.coverage
+        else:
+            cov_percent = grow_info[f"coverage_excl"] / self.coverage_excl
 
         # Update the beams if the grow step is valid
-        if _validity["res_excl"]:
-            grow_info_beam_excl.update(grow_info, grow_info["normalized_gain_excl"], excl_cov_percent)
+        if _validity[f"res_{incl_or_excl}"]:
+            grow_info_beam.update(grow_info, grow_info[f"normalized_gain_{incl_or_excl}"], cov_percent)
 
-        if _validity["res_incl"]:
-            grow_info_beam.update(grow_info, grow_info["normalized_gain_incl"], incl_cov_percent)
-
-    def grow(self, grow_info_beam, grow_info_beam_excl):
+    def grow(self, grow_info_beam, incl_or_excl):
         """ Grow the rule by one step and update the 
         
         Parameters
@@ -247,13 +246,13 @@ class Rule:
                 self.update_grow_beam(bi_array=left_bi_array, excl_bi_array=excl_left_bi_array, icol=icol,
                                       cut=cut, cut_option=constant.LEFT_CUT,
                                       incl_coverage=incl_left_coverage, excl_coverage=excl_left_coverage,
-                                      grow_info_beam=grow_info_beam, grow_info_beam_excl=grow_info_beam_excl,
+                                      grow_info_beam=grow_info_beam, incl_or_excl=incl_or_excl,
                                       _validity=_validity)
 
                 self.update_grow_beam(bi_array=right_bi_array, excl_bi_array=excl_right_bi_array, icol=icol,
                                       cut=cut, cut_option=constant.RIGHT_CUT,
                                       incl_coverage=incl_right_coverage, excl_coverage=excl_right_coverage,
-                                      grow_info_beam=grow_info_beam, grow_info_beam_excl=grow_info_beam_excl,
+                                      grow_info_beam=grow_info_beam, incl_or_excl=incl_or_excl,
                                       _validity=_validity)
 
 
