@@ -24,6 +24,7 @@ np.seterr(all='raise')
 
 h = hpy()
 make_call_graph = True
+log_learning_process = True
 
 exp_res_alldata = []
 date_and_time = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -49,6 +50,9 @@ kf = StratifiedKFold(n_splits=5, shuffle=True,
 kfold = kf.split(X=X, y=y)
 kfold_list = list(kfold)
 
+times = []
+first_run = True # to avoid logging multiple folds
+
 for fold in range(5):
     if fold_given is not None and fold != fold_given:
         continue
@@ -65,10 +69,12 @@ for fold in range(5):
     alg_config = utils_namedtuple.AlgConfig(
         num_candidate_cuts=20, max_num_rules=500, max_grow_iter=500, num_class_as_given=None,
         beam_width=10,
-        log_learning_process=True,
+        log_learning_process=True and first_run,
         log_folder_name=datetime.now().strftime("%Y%m%d_%H%M") + "_" + data_name,
         dataset_name=None,
         feature_names=d.columns[:-1],
+        which_features=None,
+        random_seed=None,
         label_names=class_labels,
         validity_check="either"
         )
@@ -104,15 +110,21 @@ for fold in range(5):
         utils.call_graph_filtered(ruleset.fit, "call_graph.png", custom_include=custom_include)
     else:
         ruleset.fit(max_iter=1000, printing=True)
-    print(ruleset)
+    
+    if first_run:
+        print(ruleset)
 
     end_time = time.time()
+    times.append(end_time - start_time)
 
     ## ROC_AUC and log-loss
     exp_res = exp_predictive_perf.calculate_exp_res(ruleset, X_test, y_test, X_train, y_train, data_name, fold, start_time, end_time)
     exp_res_alldata.append(exp_res)
 
+    first_run = False
+
 exp_res_df = pd.DataFrame(exp_res_alldata)
+print(f"Mean time: {np.mean(times)}")
 
 folder_name = "exp_uci_" + date_and_time[:8]
 os.makedirs(folder_name, exist_ok=True)
