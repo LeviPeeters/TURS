@@ -23,7 +23,7 @@ import utils
 np.seterr(all='raise')
 
 h = hpy()
-make_call_graph = True
+make_call_graph = False
 
 exp_res_alldata = []
 date_and_time = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -48,6 +48,8 @@ kf = StratifiedKFold(n_splits=5, shuffle=True,
                      random_state=2)  # can also use sklearn.model_selection.StratifiedKFold
 kfold = kf.split(X=X, y=y)
 kfold_list = list(kfold)
+
+times = []
 
 for fold in range(5):
     if fold_given is not None and fold != fold_given:
@@ -106,13 +108,15 @@ for fold in range(5):
         utils.call_graph_filtered(ruleset.fit, "call_graph.png", custom_include=custom_include)
     else:
         ruleset.fit(max_iter=1000, printing=True)
-    print(ruleset)
 
     end_time = time.time()
+    times.append(end_time - start_time)
 
     ## ROC_AUC and log-loss
     exp_res = exp_predictive_perf.calculate_exp_res(ruleset, X_test, y_test, X_train, y_train, data_name, fold, start_time, end_time)
     exp_res_alldata.append(exp_res)
+
+print("Average time:", np.mean(times))
 
 exp_res_df = pd.DataFrame(exp_res_alldata)
 
