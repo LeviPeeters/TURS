@@ -2,6 +2,8 @@ import numpy as np
 import os
 from datetime import datetime
 from threading import Thread
+from memory_profiler import profile
+from guppy import hpy
 
 import Rule
 import Beam
@@ -27,6 +29,7 @@ def make_rule_from_grow_info(grow_info):
     """
 
     rule = grow_info["_rule"]
+
     indices = rule.indices[grow_info["incl_bi_array"]]
     indices_excl = rule.indices_excl[grow_info["excl_bi_array"]]
 
@@ -112,6 +115,8 @@ class Ruleset:
             self.constraints = {}
         else:
             self.constraints = constraints
+        
+        self.hp = hpy()
         
         
 
@@ -330,6 +335,7 @@ class Ruleset:
           : Rule object
             Rule found by the beam search
         """
+
         if rule_given is None:
             rule = Rule.Rule(indices=np.arange(self.data_info.nrow), 
                         indices_excl=self.uncovered_indices,
@@ -367,7 +373,7 @@ class Ruleset:
             for t in threads:
                 t.start()
 
-            # Don't contirnue until both threads are finished
+            # Don't continue until both threads are finished
             for t in threads:
                 t.join()
 
@@ -388,6 +394,7 @@ class Ruleset:
                 previous_best_gain = np.max(final_beams["incl"].gains)
             if len(final_beams["excl"].gains) > 0:
                 previous_best_excl_gain = np.max(final_beams["excl"].gains)
+            
 
             # Stop the search if we find no improvement in k_consecutively iterations
             if counter_worse_best_gain > k_consecutively:
@@ -395,7 +402,7 @@ class Ruleset:
             else:
                 rules_for_next_iter = extract_rules_from_beams([final_beams["excl"], final_beams["incl"]])
                 rules_candidates.extend(rules_for_next_iter)
-
+        
         which_best_ = np.argmax([r.incl_gain_per_excl_coverage for r in rules_candidates])
         return rules_candidates[which_best_]
     
@@ -405,7 +412,7 @@ class Ruleset:
             beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
             rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
             beam_list.append(beam)
-        
+ 
         # Combine the beams and make GrowInfoBeam objects to store them
         final_info = self.combine_beams(beam_list, incl_or_excl)
         final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
@@ -414,6 +421,77 @@ class Ruleset:
             final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
         
         final_beams[incl_or_excl] = final_beam
+
+    def predict_ruleset(self, X_test):
+        """ This function computes the local prediction using a ruleset, given a test set.
+        
+        Parameters
+        ----------
+        ruleset : RuleSet
+            The ruleset for which we want to compute the local prediction.
+        X_test : np.array
+            The test set.
+        
+        Returns
+        -------
+        : Array
+            Probability distributions for the prediction
+        """
+        if type(X_test) != np.ndarray:
+            X_test = X_test.to_numpy()
+
+        prob_predicted = np.zeros((len(X_test), self.data_info.num_class), dtype=float)
+        cover_matrix = np.zeros((len(X_test), len(self.rules) + 1), dtype=bool)
+
+        test_uncovered_bool = np.ones(len(X_test), dtype=bool)
+        for ir, rule in enumerate(self.rules):
+            r_bool_array = np.ones(len(X_test), dtype=bool)
+
+            condition_matrix = np.array(rule.condition_matrix)
+            condition_bool = np.array(rule.condition_bool)
+            which_vars = np.where(condition_bool > 0)[0]
+
+            upper_bound, lower_bound = condition_matrix[0], condition_matrix[1]
+            upper_bound[np.isnan(upper_bound)] = np.Inf
+            lower_bound[np.isnan(lower_bound)] = -np.Inf
+
+            for v in which_vars:
+                r_bool_array = r_bool_array & (X_test[:, v] < upper_bound[v]) & (X_test[:, v] >= lower_bound[v])
+
+            cover_matrix[:, ir] = r_bool_array
+            test_uncovered_bool = test_uncovered_bool & ~r_bool_array
+        cover_matrix[:, -1] = test_uncovered_bool
+
+        # From chatGPT: "I use dtype=object to allow the elements of powers_of_2 and binary_vector to be Python integers which can handle arbitrary large values."
+        # That is, by using "object", the element of numpy array becomes Python Int, instead of numpy.int64;
+        cover_matrix_int = cover_matrix.astype(int)
+        unique_id = np.zeros(len(X_test), dtype=object)
+        power_of_two = 2 ** np.arange(cover_matrix_int.shape[1], dtype=object)
+        for kol in range(cover_matrix_int.shape[1]):
+            # unique_id += 2 ** kol * cover_matrix_int[:, kol]    # This may fail when 2 ** kol becomes very large
+            unique_id += power_of_two[kol] * cover_matrix_int[:, kol].astype(object)
+
+        groups, ret_index = np.unique(unique_id, return_index=True)
+        unique_id_dir = {}
+        for g, rind in zip(groups, ret_index):
+            unique_id_dir[g] = cover_matrix_int[rind]
+
+        unique_id_prob_dir = {}
+        for z, t in unique_id_dir.items():
+            bool_model = np.zeros(len(self.data_info.target), dtype=bool)
+            for i_tt, tt in enumerate(t):
+                if tt == 1:
+                    if i_tt == len(self.rules):
+                        bool_model = self.uncovered_bool
+                    else:
+                        bool_model = np.bitwise_or(bool_model, self.rules[i_tt].bool_array)
+            unique_id_prob_dir[z] = utils_calculating_cl.calc_probs(self.data_info.target[bool_model],
+                                            self.data_info.num_class)
+
+        for i in range(len(prob_predicted)):
+            prob_predicted[i] = unique_id_prob_dir[unique_id[i]]
+
+        return prob_predicted
 
     def __str__(self):
         """ This function prints a ruleset in a readable way.

@@ -1,4 +1,6 @@
 import numpy as np
+from memory_profiler import profile
+from guppy import hpy
 
 import utils_calculating_cl
 import nml_regret
@@ -174,6 +176,7 @@ class Rule:
         info_theo_scores = self.calculate_mdl_gain(bi_array=bi_array, excl_bi_array=excl_bi_array,
                                                    icol=icol, cut_option=cut_option)
         
+
         # Store info in a dictionary
         grow_info = store_grow_info(
             excl_bi_array=excl_bi_array, incl_bi_array=bi_array, icol=icol,

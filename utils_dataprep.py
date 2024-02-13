@@ -22,7 +22,6 @@ import exp_utils
 
 def read_data(data_name):
     """ Read data from one of the standard datasets into a Pandas DataFrame
-    TODO: All of the locatus related stuff should be moved to a separate file later
 
     Parameters
     ---
@@ -40,19 +39,6 @@ def read_data(data_name):
     datasets_without_header_row = ["chess", "iris", "waveform", "backnote", "contracept", "ionosphere",
                                    "magic", "car", "tic-tac-toe", "wine", "glass", "pendigits", "HeartCleveland"]
     datasets_with_header_row = ["avila", "anuran", "diabetes", "Vehicle", "DryBeans"]
-    
-    # Locatus data can be split into subsets for testing
-    Locatus_data = ["Leiden", "Zeeland", "Amsterdam", "Zuid", "Full"]
-
-    # # Some columns need to be converted to a different data type
-    # dt_int = ["INW", "WVO", "PASSANTENAANTAL", "UNITID", "TARGET"]
-    # dt_float = ["XCOORD", "YCOORD"]
-    # dt_str = ["GEMEENTE", "PROVINCIE", "POSTCODE", "PC4", "WOONPLID", "WINKELGEBIEDID", "SUBCENTRUMID", "WINKELGEBIEDHOOFDTYPE", "WINKELGEBIEDTYPERING", "BINNENSTAD", "FORMULE", "GROEP", "BRANCHE", "HOOFDBRANCHE", "BEZOEKMOTIEFTYPE"]
-
-    # For now, we only use a few columns
-    dt_int = ["INW", "WVO", "PASSANTENAANTAL", "TARGET"]
-    dt_float = []
-    dt_str = ["GROEP", "BEZOEKMOTIEFTYPE"]
 
     if data_name in datasets_without_header_row:
         d = pd.read_csv(data_path, header=None)
@@ -60,32 +46,7 @@ def read_data(data_name):
         features.append("y")
         d.columns = features
     elif data_name in datasets_with_header_row:
-        d = pd.read_csv(data_path)
-    elif data_name in Locatus_data:
-        d = pd.read_csv("../Masterproject/data/prepared_data/merged_39278d2.csv", sep=",")
-        
-        # Select a subset of the data
-        if data_name == 'Leiden':
-            d = d[d["GEMEENTE"] == "Leiden"].copy()
-        elif data_name == 'Zeeland':
-            d = d[d["PROVINCIE"] == "Zeeland"].copy()
-        elif data_name == 'Amsterdam':
-            d = d[d["GEMEENTE"] == "Amsterdam"].copy()
-        elif data_name == 'Zuid':
-            d = d[d["PROVINCIE"] == "Zeeland"].copy() + d[d["PROVINCIE"] == "Limburg"].copy() + d[d["PROVINCIE"] == "Noord-Brabant"].copy()
-            
-        # Set correct dtypes and drop unneeded columns
-        for col in d:
-            if col in dt_int:
-                d[col] = d[col].astype('int')
-            elif col in dt_float:
-                d[col] = d[col].astype('float')
-            elif col in dt_str:
-                d[col] = d[col].astype('str')
-            else:
-                d.drop(col, axis=1, inplace=True)
-
-        
+        d = pd.read_csv(data_path)        
     else:
         sys.exit("error: data name not in the datasets lists that show whether the header should be included!")
     if data_name == "anuran":

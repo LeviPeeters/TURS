@@ -11,19 +11,13 @@ from guppy import hpy
 
 from sklearn.model_selection import StratifiedKFold
 
-import DataInfo 
-import Ruleset
-import ModelEncoding
-import DataEncoding
-
-import exp_predictive_perf
-import utils_namedtuple
-import utils
+import TURS
+import utils_dataprep
 
 np.seterr(all='raise')
+print("Running TURS with multithreading")
 
 h = hpy()
-make_call_graph = False
 
 exp_res_alldata = []
 date_and_time = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -38,8 +32,8 @@ else:
     data_name = "iris"
     fold_given = 0
 
-d = exp_predictive_perf.read_data(data_name)
-d, class_labels = exp_predictive_perf.preprocess_data(d)
+d = utils_dataprep.read_data(data_name)
+d, class_labels = utils_dataprep.preprocess_data(d)
 
 X = d.iloc[:, :d.shape[1] - 1].to_numpy()
 y = d.iloc[:, d.shape[1] - 1].to_numpy()
@@ -50,6 +44,7 @@ kfold = kf.split(X=X, y=y)
 kfold_list = list(kfold)
 
 times = []
+first_run = True
 
 for fold in range(5):
     if fold_given is not None and fold != fold_given:
@@ -64,66 +59,32 @@ for fold in range(5):
     y_test = dtest.iloc[:, -1].to_numpy()
 
     start_time = time.time()
-    alg_config = utils_namedtuple.AlgConfig(
-        num_candidate_cuts=20, max_num_rules=500, max_grow_iter=500, num_class_as_given=None,
+    
+    turs = TURS(
+        num_candidate_cuts=20,
+        max_num_rules=500,
+        max_grow_iter=500,
+        num_class_as_given=None,
         beam_width=10,
-        log_learning_process=False,
+        log_learning_process=first_run,
         log_folder_name=datetime.now().strftime("%Y%m%d_%H%M") + "_" + data_name,
         dataset_name=None,
-        feature_names=d.columns[:-1],
-        label_names=class_labels,
+        feature_names=None,
+        label_names=None,
         which_features=None,
         random_seed=None,
         validity_check="either"
-        )
-    data_info = DataInfo.DataInfo(X=X_train, y=y_train, beam_width=None, alg_config=alg_config)
-
-    data_encoding = DataEncoding.NMLencoding(data_info)
-    model_encoding = ModelEncoding.ModelEncodingDependingOnData(data_info)
-    ruleset = Ruleset.Ruleset(
-        data_info=data_info, 
-        data_encoding=data_encoding, 
-        model_encoding=model_encoding
     )
-
-    if make_call_graph:
-        custom_include = [
-            "Beam.*",
-            "exp_utils.*",
-            "ModellingGroup.*",
-            "nml_regret.*",
-            "Rule.*",
-            "RuleGrowConstraint.*",
-            "utils_modelencoding.*",
-            "utils_namedtuple.*",
-            "utils_predict.*",
-            "Ruleset.*", 
-            "ModelEncoding.*", 
-            "DataEncoding.*", 
-            "DataInfo.*", 
-            "utils_calculating_cl.*",  
-            "exp_predictive_perf.*",
-            "run_uci.*",
-        ]
-        utils.call_graph_filtered(ruleset.fit, "call_graph.png", custom_include=custom_include)
-    else:
-        ruleset.fit(max_iter=1000, printing=True)
+    
+    ruleset = turs.fit(X_train, y_train, printing=True)
 
     end_time = time.time()
+
     times.append(end_time - start_time)
 
-    ## ROC_AUC and log-loss
-    exp_res = exp_predictive_perf.calculate_exp_res(ruleset, X_test, y_test, X_train, y_train, data_name, fold, start_time, end_time)
-    exp_res_alldata.append(exp_res)
+    # Make predictions on test set
+    y_pred = turs.predict(X_test)
+
+    first_run = False
 
 print("Average time:", np.mean(times))
-
-exp_res_df = pd.DataFrame(exp_res_alldata)
-
-folder_name = "exp_uci_" + date_and_time[:8]
-os.makedirs(folder_name, exist_ok=True)
-if fold_given is None:
-    res_file_name = "./" + folder_name + "/" + date_and_time + "_" + data_name + "_uci_datasets_res.csv"
-else:
-    res_file_name = "./" + folder_name + "/" + date_and_time + "_" + data_name + "_fold" + str(fold_given) + "_uci_datasets_res.csv"
-exp_res_df.to_csv(res_file_name, index=False)

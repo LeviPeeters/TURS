@@ -1,0 +1,936 @@
+Running TURS with multithreading
+running:  diabetes ; fold:  0
+Partition of a set of 12 objects. Total size = 6814 bytes.
+ Index  Count   %     Size   % Cumulative  % Kind (class / dict of class)
+     0      3  25     5862  86      5862  86 numpy.ndarray
+     1      1   8      400   6      6262  92 types.FrameType
+     2      1   8      232   3      6494  95 dict of Ruleset.Ruleset
+     3      2  17      112   2      6606  97 list
+     4      3  25       96   1      6702  98 numpy.float64
+     5      1   8       64   1      6766  99 dict (no owner)
+     6      1   8       48   1      6814 100 Ruleset.Ruleset
+Iteration: 0Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    245.9 MiB    245.9 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    245.9 MiB      0.0 MiB           1           beam_list = []
+   406    246.0 MiB      0.0 MiB           2           for rule in rules_for_next_iter:
+   407    245.9 MiB      0.0 MiB           1               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.0 MiB      0.1 MiB           1               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.0 MiB      0.0 MiB           1               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.0 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.0 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.0 MiB      0.0 MiB          11           for info in final_info:
+   416    246.0 MiB      0.0 MiB          10               final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.0 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    245.9 MiB    245.9 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    245.9 MiB      0.0 MiB           1           beam_list = []
+   406    246.0 MiB      0.0 MiB           2           for rule in rules_for_next_iter:
+   407    245.9 MiB      0.0 MiB           1               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.0 MiB      0.1 MiB           1               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.0 MiB      0.0 MiB           1               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.0 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.0 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.1 MiB      0.1 MiB          11           for info in final_info:
+   416    246.1 MiB      0.0 MiB          10               final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.1 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.1 MiB    246.1 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.1 MiB      0.0 MiB           1           beam_list = []
+   406    246.2 MiB      0.0 MiB          11           for rule in rules_for_next_iter:
+   407    246.2 MiB      0.0 MiB          10               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.2 MiB      0.1 MiB          10               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.2 MiB      0.0 MiB          10               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.2 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.2 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.2 MiB      0.0 MiB          11           for info in final_info:
+   416    246.2 MiB      0.0 MiB          10               final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.2 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.1 MiB    246.1 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.1 MiB      0.0 MiB           1           beam_list = []
+   406    246.2 MiB      0.0 MiB          11           for rule in rules_for_next_iter:
+   407    246.2 MiB      0.0 MiB          10               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.2 MiB      0.1 MiB          10               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.2 MiB      0.0 MiB          10               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.2 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.2 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.2 MiB      0.0 MiB          11           for info in final_info:
+   416    246.2 MiB      0.0 MiB          10               final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.2 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.2 MiB    246.2 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.2 MiB      0.0 MiB           1           beam_list = []
+   406    246.2 MiB      0.0 MiB          11           for rule in rules_for_next_iter:
+   407    246.2 MiB      0.0 MiB          10               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.2 MiB      0.0 MiB          10               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.2 MiB      0.0 MiB          10               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.2 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.2 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.2 MiB      0.0 MiB          11           for info in final_info:
+   416    246.2 MiB      0.0 MiB          10               final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.2 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.2 MiB    246.2 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.2 MiB      0.0 MiB           1           beam_list = []
+   406    246.2 MiB      0.0 MiB          11           for rule in rules_for_next_iter:
+   407    246.2 MiB      0.0 MiB          10               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.2 MiB      0.0 MiB          10               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.2 MiB      0.0 MiB          10               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.2 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.2 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.2 MiB      0.0 MiB          11           for info in final_info:
+   416    246.2 MiB      0.0 MiB          10               final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.2 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.2 MiB    246.2 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.2 MiB      0.0 MiB           1           beam_list = []
+   406    246.2 MiB      0.0 MiB          11           for rule in rules_for_next_iter:
+   407    246.2 MiB      0.0 MiB          10               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.2 MiB      0.0 MiB          10               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.2 MiB      0.0 MiB          10               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.2 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.2 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.2 MiB      0.0 MiB          11           for info in final_info:
+   416    246.2 MiB      0.0 MiB          10               final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.2 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.2 MiB    246.2 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.2 MiB      0.0 MiB           1           beam_list = []
+   406    246.2 MiB      0.0 MiB          11           for rule in rules_for_next_iter:
+   407    246.2 MiB      0.0 MiB          10               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.2 MiB      0.0 MiB          10               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.2 MiB      0.0 MiB          10               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.2 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.2 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.2 MiB      0.0 MiB          11           for info in final_info:
+   416    246.2 MiB      0.0 MiB          10               final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.2 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.2 MiB    246.2 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.2 MiB      0.0 MiB           1           beam_list = []
+   406    246.2 MiB      0.0 MiB          11           for rule in rules_for_next_iter:
+   407    246.2 MiB      0.0 MiB          10               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.2 MiB      0.0 MiB          10               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.2 MiB      0.0 MiB          10               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.2 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.2 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.2 MiB      0.0 MiB           1           for info in final_info:
+   416                                                     final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.2 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.2 MiB    246.2 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.2 MiB      0.0 MiB           1           beam_list = []
+   406    246.2 MiB      0.0 MiB          11           for rule in rules_for_next_iter:
+   407    246.2 MiB      0.0 MiB          10               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.2 MiB      0.0 MiB          10               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.2 MiB      0.0 MiB          10               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.2 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.2 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.2 MiB      0.0 MiB           1           for info in final_info:
+   416                                                     final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.2 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Iteration: 1Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.2 MiB    246.2 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.2 MiB      0.0 MiB           1           beam_list = []
+   406    246.2 MiB      0.0 MiB           2           for rule in rules_for_next_iter:
+   407    246.2 MiB      0.0 MiB           1               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.2 MiB      0.0 MiB           1               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.2 MiB      0.0 MiB           1               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.2 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.2 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.2 MiB      0.0 MiB          11           for info in final_info:
+   416    246.2 MiB      0.0 MiB          10               final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.2 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.2 MiB    246.2 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.2 MiB      0.0 MiB           1           beam_list = []
+   406    246.2 MiB      0.0 MiB           2           for rule in rules_for_next_iter:
+   407    246.2 MiB      0.0 MiB           1               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.2 MiB      0.0 MiB           1               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.2 MiB      0.0 MiB           1               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.2 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.2 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.2 MiB      0.0 MiB          11           for info in final_info:
+   416    246.2 MiB      0.0 MiB          10               final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.2 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.2 MiB    246.2 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.2 MiB      0.0 MiB           1           beam_list = []
+   406    246.4 MiB      0.0 MiB          20           for rule in rules_for_next_iter:
+   407    246.2 MiB      0.0 MiB          19               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.4 MiB      0.1 MiB          19               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.4 MiB      0.0 MiB          19               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.4 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.4 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.4 MiB      0.0 MiB          11           for info in final_info:
+   416    246.4 MiB      0.0 MiB          10               final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.4 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.2 MiB    246.2 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.2 MiB      0.0 MiB           1           beam_list = []
+   406    246.4 MiB      0.0 MiB          20           for rule in rules_for_next_iter:
+   407    246.4 MiB      0.0 MiB          19               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.4 MiB      0.1 MiB          19               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.4 MiB      0.0 MiB          19               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.4 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.4 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.4 MiB      0.0 MiB          11           for info in final_info:
+   416    246.4 MiB      0.0 MiB          10               final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.4 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.4 MiB    246.4 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.4 MiB      0.0 MiB           1           beam_list = []
+   406    246.4 MiB      0.0 MiB          16           for rule in rules_for_next_iter:
+   407    246.4 MiB      0.0 MiB          15               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.4 MiB      0.0 MiB          15               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.4 MiB      0.0 MiB          15               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.4 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.4 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.4 MiB      0.0 MiB          11           for info in final_info:
+   416    246.4 MiB      0.0 MiB          10               final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.4 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.4 MiB    246.4 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.4 MiB      0.0 MiB           1           beam_list = []
+   406    246.4 MiB      0.0 MiB          16           for rule in rules_for_next_iter:
+   407    246.4 MiB      0.0 MiB          15               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.4 MiB      0.0 MiB          15               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.4 MiB      0.0 MiB          15               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.4 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.4 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.4 MiB      0.0 MiB          11           for info in final_info:
+   416    246.4 MiB      0.0 MiB          10               final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.4 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.4 MiB    246.4 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.4 MiB      0.0 MiB           1           beam_list = []
+   406    246.4 MiB      0.0 MiB          18           for rule in rules_for_next_iter:
+   407    246.4 MiB      0.0 MiB          17               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.4 MiB      0.0 MiB          17               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.4 MiB      0.0 MiB          17               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.4 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.4 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.4 MiB      0.0 MiB           5           for info in final_info:
+   416    246.4 MiB      0.0 MiB           4               final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.4 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.4 MiB    246.4 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.4 MiB      0.0 MiB           1           beam_list = []
+   406    246.4 MiB      0.0 MiB          18           for rule in rules_for_next_iter:
+   407    246.4 MiB      0.0 MiB          17               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.4 MiB      0.0 MiB          17               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.4 MiB      0.0 MiB          17               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.4 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.4 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.4 MiB      0.0 MiB          11           for info in final_info:
+   416    246.4 MiB      0.0 MiB          10               final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.4 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.4 MiB    246.4 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.4 MiB      0.0 MiB           1           beam_list = []
+   406    246.4 MiB      0.0 MiB          12           for rule in rules_for_next_iter:
+   407    246.4 MiB      0.0 MiB          11               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.4 MiB      0.0 MiB          11               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.4 MiB      0.0 MiB          11               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.4 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.4 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.4 MiB      0.0 MiB           1           for info in final_info:
+   416                                                     final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.4 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.4 MiB    246.4 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.4 MiB      0.0 MiB           1           beam_list = []
+   406    246.4 MiB      0.0 MiB          12           for rule in rules_for_next_iter:
+   407    246.4 MiB      0.0 MiB          11               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.4 MiB      0.0 MiB          11               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.4 MiB      0.0 MiB          11               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.4 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.4 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.4 MiB      0.0 MiB           1           for info in final_info:
+   416                                                     final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.4 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Iteration: 2Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.4 MiB    246.4 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.4 MiB      0.0 MiB           1           beam_list = []
+   406    246.4 MiB      0.0 MiB           2           for rule in rules_for_next_iter:
+   407    246.4 MiB      0.0 MiB           1               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.4 MiB      0.0 MiB           1               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.4 MiB      0.0 MiB           1               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.4 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.4 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.4 MiB      0.0 MiB           5           for info in final_info:
+   416    246.4 MiB      0.0 MiB           4               final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.4 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.4 MiB    246.4 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.4 MiB      0.0 MiB           1           beam_list = []
+   406    246.4 MiB      0.0 MiB           2           for rule in rules_for_next_iter:
+   407    246.4 MiB      0.0 MiB           1               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.4 MiB      0.0 MiB           1               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.4 MiB      0.0 MiB           1               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.4 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.4 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.4 MiB      0.0 MiB          11           for info in final_info:
+   416    246.4 MiB      0.0 MiB          10               final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.4 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.4 MiB    246.4 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.4 MiB      0.0 MiB           1           beam_list = []
+   406    246.4 MiB      0.0 MiB          13           for rule in rules_for_next_iter:
+   407    246.4 MiB      0.0 MiB          12               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.4 MiB      0.0 MiB          12               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.4 MiB      0.0 MiB          12               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.4 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.4 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.4 MiB      0.0 MiB          11           for info in final_info:
+   416    246.4 MiB      0.0 MiB          10               final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.4 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.4 MiB    246.4 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.4 MiB      0.0 MiB           1           beam_list = []
+   406    246.4 MiB      0.0 MiB          13           for rule in rules_for_next_iter:
+   407    246.4 MiB      0.0 MiB          12               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.4 MiB      0.0 MiB          12               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.4 MiB      0.0 MiB          12               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.4 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.4 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.4 MiB      0.0 MiB          11           for info in final_info:
+   416    246.4 MiB      0.0 MiB          10               final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.4 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.4 MiB    246.4 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.4 MiB      0.0 MiB           1           beam_list = []
+   406    246.4 MiB      0.0 MiB          18           for rule in rules_for_next_iter:
+   407    246.4 MiB      0.0 MiB          17               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.4 MiB      0.0 MiB          17               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.4 MiB      0.0 MiB          17               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.4 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.4 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.4 MiB      0.0 MiB           5           for info in final_info:
+   416    246.4 MiB      0.0 MiB           4               final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.4 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.4 MiB    246.4 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.4 MiB      0.0 MiB           1           beam_list = []
+   406    246.4 MiB      0.0 MiB          18           for rule in rules_for_next_iter:
+   407    246.4 MiB      0.0 MiB          17               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.4 MiB      0.0 MiB          17               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.4 MiB      0.0 MiB          17               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.4 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.4 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.4 MiB      0.0 MiB          11           for info in final_info:
+   416    246.4 MiB      0.0 MiB          10               final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.4 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.4 MiB    246.4 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.4 MiB      0.0 MiB           1           beam_list = []
+   406    246.4 MiB      0.0 MiB          14           for rule in rules_for_next_iter:
+   407    246.4 MiB      0.0 MiB          13               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.4 MiB      0.0 MiB          13               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.4 MiB      0.0 MiB          13               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.4 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.4 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.4 MiB      0.0 MiB           1           for info in final_info:
+   416                                                     final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.4 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.4 MiB    246.4 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.4 MiB      0.0 MiB           1           beam_list = []
+   406    246.4 MiB      0.0 MiB          14           for rule in rules_for_next_iter:
+   407    246.4 MiB      0.0 MiB          13               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.4 MiB      0.0 MiB          13               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.4 MiB      0.0 MiB          13               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.4 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.4 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.4 MiB      0.0 MiB          11           for info in final_info:
+   416    246.4 MiB      0.0 MiB          10               final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.4 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.4 MiB    246.4 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.4 MiB      0.0 MiB           1           beam_list = []
+   406    246.4 MiB      0.0 MiB          11           for rule in rules_for_next_iter:
+   407    246.4 MiB      0.0 MiB          10               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.4 MiB      0.0 MiB          10               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.4 MiB      0.0 MiB          10               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.4 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.4 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.4 MiB      0.0 MiB           3           for info in final_info:
+   416    246.4 MiB      0.0 MiB           2               final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.4 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.4 MiB    246.4 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.4 MiB      0.0 MiB           1           beam_list = []
+   406    246.4 MiB      0.0 MiB          11           for rule in rules_for_next_iter:
+   407    246.4 MiB      0.0 MiB          10               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.4 MiB      0.0 MiB          10               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.4 MiB      0.0 MiB          10               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.4 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.4 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.4 MiB      0.0 MiB           3           for info in final_info:
+   416    246.4 MiB      0.0 MiB           2               final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.4 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.4 MiB    246.4 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.4 MiB      0.0 MiB           1           beam_list = []
+   406    246.4 MiB      0.0 MiB           3           for rule in rules_for_next_iter:
+   407    246.4 MiB      0.0 MiB           2               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.4 MiB      0.0 MiB           2               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.4 MiB      0.0 MiB           2               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.4 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.4 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.4 MiB      0.0 MiB           1           for info in final_info:
+   416                                                     final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.4 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.4 MiB    246.4 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.4 MiB      0.0 MiB           1           beam_list = []
+   406    246.4 MiB      0.0 MiB           3           for rule in rules_for_next_iter:
+   407    246.4 MiB      0.0 MiB           2               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.4 MiB      0.0 MiB           2               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.4 MiB      0.0 MiB           2               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.4 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.4 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.4 MiB      0.0 MiB           1           for info in final_info:
+   416                                                     final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.4 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Iteration: 3Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.4 MiB    246.4 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.4 MiB      0.0 MiB           1           beam_list = []
+   406    246.4 MiB      0.0 MiB           2           for rule in rules_for_next_iter:
+   407    246.4 MiB      0.0 MiB           1               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.4 MiB      0.0 MiB           1               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.4 MiB      0.0 MiB           1               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.4 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.4 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.4 MiB      0.0 MiB           5           for info in final_info:
+   416    246.4 MiB      0.0 MiB           4               final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.4 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.4 MiB    246.4 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.4 MiB      0.0 MiB           1           beam_list = []
+   406    246.4 MiB      0.0 MiB           2           for rule in rules_for_next_iter:
+   407    246.4 MiB      0.0 MiB           1               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.4 MiB      0.0 MiB           1               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.4 MiB      0.0 MiB           1               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.4 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.4 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.4 MiB      0.0 MiB          11           for info in final_info:
+   416    246.4 MiB      0.0 MiB          10               final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.4 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.4 MiB    246.4 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.4 MiB      0.0 MiB           1           beam_list = []
+   406    246.4 MiB      0.0 MiB          13           for rule in rules_for_next_iter:
+   407    246.4 MiB      0.0 MiB          12               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.4 MiB      0.0 MiB          12               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.4 MiB      0.0 MiB          12               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.4 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.4 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.4 MiB      0.0 MiB          11           for info in final_info:
+   416    246.4 MiB      0.0 MiB          10               final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.4 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.4 MiB    246.4 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.4 MiB      0.0 MiB           1           beam_list = []
+   406    246.4 MiB      0.0 MiB          13           for rule in rules_for_next_iter:
+   407    246.4 MiB      0.0 MiB          12               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.4 MiB      0.0 MiB          12               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.4 MiB      0.0 MiB          12               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.4 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.4 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.4 MiB      0.0 MiB           5           for info in final_info:
+   416    246.4 MiB      0.0 MiB           4               final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.4 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.4 MiB    246.4 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.4 MiB      0.0 MiB           1           beam_list = []
+   406    246.4 MiB      0.0 MiB          15           for rule in rules_for_next_iter:
+   407    246.4 MiB      0.0 MiB          14               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.4 MiB      0.0 MiB          14               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.4 MiB      0.0 MiB          14               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.4 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.4 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.4 MiB      0.0 MiB           1           for info in final_info:
+   416                                                     final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.4 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.4 MiB    246.4 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.4 MiB      0.0 MiB           1           beam_list = []
+   406    246.4 MiB      0.0 MiB          15           for rule in rules_for_next_iter:
+   407    246.4 MiB      0.0 MiB          14               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.4 MiB      0.0 MiB          14               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.4 MiB      0.0 MiB          14               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.4 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.4 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.4 MiB      0.0 MiB          11           for info in final_info:
+   416    246.4 MiB      0.0 MiB          10               final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.4 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.4 MiB    246.4 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.4 MiB      0.0 MiB           1           beam_list = []
+   406    246.4 MiB      0.0 MiB          11           for rule in rules_for_next_iter:
+   407    246.4 MiB      0.0 MiB          10               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.4 MiB      0.0 MiB          10               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.4 MiB      0.0 MiB          10               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.4 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.4 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.4 MiB      0.0 MiB           5           for info in final_info:
+   416    246.4 MiB      0.0 MiB           4               final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.4 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.4 MiB    246.4 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.4 MiB      0.0 MiB           1           beam_list = []
+   406    246.4 MiB      0.0 MiB          11           for rule in rules_for_next_iter:
+   407    246.4 MiB      0.0 MiB          10               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.4 MiB      0.0 MiB          10               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.4 MiB      0.0 MiB          10               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.4 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.4 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.4 MiB      0.0 MiB           1           for info in final_info:
+   416                                                     final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.4 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.4 MiB    246.4 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.4 MiB      0.0 MiB           1           beam_list = []
+   406    246.4 MiB      0.0 MiB           5           for rule in rules_for_next_iter:
+   407    246.4 MiB      0.0 MiB           4               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.4 MiB      0.0 MiB           4               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.4 MiB      0.0 MiB           4               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.4 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.4 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.4 MiB      0.0 MiB           1           for info in final_info:
+   416                                                     final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.4 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Filename: /home/levi/Studie/Masterproject/TURS/Ruleset.py
+
+Line #    Mem usage    Increment  Occurrences   Line Contents
+=============================================================
+   403    246.4 MiB    246.4 MiB           1       @profile
+   404                                             def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+   405    246.4 MiB      0.0 MiB           1           beam_list = []
+   406    246.4 MiB      0.0 MiB           5           for rule in rules_for_next_iter:
+   407    246.4 MiB      0.0 MiB           4               beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+   408    246.4 MiB      0.0 MiB           4               rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+   409    246.4 MiB      0.0 MiB           4               beam_list.append(beam)
+   410                                                 
+   411                                                 # Combine the beams and make GrowInfoBeam objects to store them
+   412    246.4 MiB      0.0 MiB           1           final_info = self.combine_beams(beam_list, incl_or_excl)
+   413    246.4 MiB      0.0 MiB           1           final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+   414                                         
+   415    246.4 MiB      0.0 MiB           1           for info in final_info:
+   416                                                     final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+   417                                                 
+   418    246.4 MiB      0.0 MiB           1           final_beams[incl_or_excl] = final_beam
+
+
+Average time: 49.157697439193726
