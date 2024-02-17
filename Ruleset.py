@@ -44,7 +44,8 @@ def make_rule_from_grow_info(grow_info):
                 rule_base=rule, condition_matrix=condition_matrix, ruleset=rule.ruleset,
                 mdl_gain_excl=grow_info["excl_mdl_gain"],
                 mdl_gain=grow_info["incl_mdl_gain"],
-                icols_in_order=new_icols_in_order)
+                icols_in_order=new_icols_in_order, 
+                printing=rule.printing)
     return rule
 
 def extract_rules_from_beams(beams):
@@ -81,6 +82,7 @@ class Ruleset:
                  data_info: DataInfo.DataInfo,
                  data_encoding: DataEncoding.NMLencoding,
                  model_encoding: ModelEncoding.ModelEncodingDependingOnData,
+                 printing=False,
                  constraints = None):
 
         self.data_info = data_info
@@ -107,10 +109,13 @@ class Ruleset:
 
         self.allrules_cl_data = 0
 
+        self.printing = printing
+
         if constraints is None:
             self.constraints = {}
         else:
             self.constraints = constraints
+
         
         
 
@@ -122,6 +127,9 @@ class Ruleset:
         rule : Rule object
             Rule to be added to the ruleset
         """
+        if self.printing:
+            print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - add_rule")
+
         # Append the rule
         self.rules.append(rule)
         
@@ -192,7 +200,7 @@ class Ruleset:
             self.modelling_groups.append(mg)
         return np.sum(all_mg_negloglike)
 
-    def fit(self, max_iter=1000, printing=True):
+    def fit(self, max_iter=1000):
         """ Fit the data by iteratively adding rules to the ruleset
         # TODO: Think about logging
         
@@ -208,12 +216,14 @@ class Ruleset:
         total_cl : float
             Total code length of the ruleset
         """
+        if self.printing:
+            print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - ruleset.fit")
 
         # Keep track of CL progression
         total_cl = [self.total_cl]
 
         for iter in range(max_iter):
-            if printing:
+            if self.printing:
                 print(f"Iteration: {iter}", end="\r")
 
             if self.data_info.log_learning_process:
@@ -290,6 +300,9 @@ class Ruleset:
         final_info_excl : list
             list of info dicts for the best rules, excluding previously covered instances
         """
+        if self.printing:
+            print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - ruleset.combine_beams")
+
         infos_incl, infos_excl = [], []
         coverages_incl, coverages_excl = [], []
 
@@ -342,6 +355,9 @@ class Ruleset:
           : Rule object
             Rule found by the beam search
         """
+        if self.printing:
+            print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - ruleset.search_next_rule")
+
         if rule_given is None:
             rule = Rule.Rule(indices=np.arange(self.data_info.nrow), 
                         indices_excl=self.uncovered_indices,
@@ -351,7 +367,8 @@ class Ruleset:
                         ruleset=self, 
                         mdl_gain=-np.Inf, 
                         mdl_gain_excl=-np.Inf, 
-                        icols_in_order=[])
+                        icols_in_order=[],
+                        printing=self.printing)
         else:
             rule = rule_given  
 

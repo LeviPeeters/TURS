@@ -1,28 +1,43 @@
 import numpy as np
 import pandas as pd
+import os
 import utils 
+from multiprocessing import shared_memory
+from test2 import DataInfo
+from datetime import datetime
 
-def huts():
-    print("Huts")
-    return 1
+class ClassB:
+    def __init__(self, shared_array):
+        self.shared_array = shared_array
 
-def huts2():
-    x = np.array([1, 2, 3])
-    y = pd.DataFrame(x)
-    # Call a bunch of descriptive functions
-    y = y.to_numpy()
-    y = y.flatten()
-    y = y.mean()
-    y = y.sum()
-    y = y.max()
-    y = y.min()
-    y = y.std()
-    y = y.var()
-    y = y.cumsum()
+    def get_data_view(self, rows):
+        return self.shared_array[rows]
     
-    huts()
+    def close(self):
+        self.shared_array.close()
 
-if __name__=="__main__":
-    utils.call_graph_filtered(huts2, "call_graph_test.png")
-    huts2()
-    print("Done")
+print(os.getppid())
+print(f"{datetime.now()} - begin")
+breakpoint()
+
+# Initialize ClassA with some data
+datainfo = DataInfo()
+datainfo.initialize((100000, 1000))
+
+print(f"{datetime.now()} - data initialized")
+breakpoint()
+
+# Initialize ClassB with the shared memory
+b = ClassB(datainfo.shared_data.buf)
+
+print(f"{datetime.now()} - ClassB initialized")
+
+# Now you can use ClassB with different permutations of rows
+rows1 = [0, 1, 2, 3]
+rows2 = [100, 101, 102, 103]
+# view1 = b.get_data_view(rows1)
+view2 = b.get_data_view(rows2)
+
+# Ensure to cleanup shared memory when done
+b.close()
+datainfo.close()

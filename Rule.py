@@ -1,9 +1,11 @@
 import numpy as np
+from datetime import datetime
+from time import sleep
+import sys
 
 import utils_calculating_cl
 import nml_regret
 import Beam
-import RuleGrowConstraint
 import DataInfo
 
 import constant
@@ -32,30 +34,37 @@ class Rule:
                  ruleset,
                  mdl_gain, 
                  mdl_gain_excl, 
-                 icols_in_order):
-        
+                 icols_in_order,
+                 printing):
+        if printing:
+            print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - rule.__init__")       
+
         self.ruleset = ruleset
         self.data_info = data_info # Metadata
         self.rule_base = rule_base  # The previous level of this rule
         self.icols_in_order = icols_in_order  # The order of the columns in the data
 
+
         # Numpy arrays with indices of covered indices
         self.indices = indices  
         self.indices_excl = indices_excl  
+
 
         # Boolean arrays indicating covered indices
         self.bool_array = self.get_bool_array(self.indices)
         self.bool_array_excl = self.get_bool_array(self.indices_excl)
 
+
         # Number of instances covered by this rule
         self.coverage = len(self.indices) 
         self.coverage_excl = len(self.indices_excl)
 
-        # Feature- and target subvector covered by the rule
-        self.features = self.data_info.features[indices]
+        # The feature arrays take up far too much memory, especially because empty rules cover the entire dataset\
+        # self.features = self.data_info.features[indices]
         self.target = self.data_info.target[indices]
-        self.features_excl = self.data_info.features[indices_excl]
+        # self.features_excl = self.data_info.features[indices_excl]
         self.target_excl = self.data_info.target[indices_excl]
+
 
         # Condition matrix containing the rule literals and a boolean array to show which features have a condition
         self.condition_matrix = condition_matrix
@@ -72,6 +81,9 @@ class Rule:
         self.mdl_gain = mdl_gain
         self.mdl_gain_excl = mdl_gain_excl
 
+        self.printing = printing
+
+
         if self.rule_base is None:
             self.incl_mdl_gain, self.excl_mdl_gain = -np.Inf, -np.Inf
             self.incl_gain_per_excl_coverage, self.excl_gain_per_excl_coverage = -np.Inf, -np.Inf
@@ -81,6 +93,7 @@ class Rule:
                 self.incl_gain_per_excl_coverage, self.excl_gain_per_excl_coverage = np.nan, np.nan
             else:
                 self.incl_gain_per_excl_coverage, self.excl_gain_per_excl_coverage = mdl_gain / self.coverage_excl, mdl_gain_excl / self.coverage_excl
+
 
 
     def _calc_probs(self, target):
@@ -127,15 +140,19 @@ class Rule:
             
         Returns
         candidate_cuts_icol : Array
-            List of candidate cuts for the feature
+            List of candidate cuts for the feature 
         """
         if self.rule_base is None:
-            candidate_cuts_selector = (candidate_cuts[icol] < np.max(self.features_excl[:, icol])) & \
-                                      (candidate_cuts[icol] > np.min(self.features_excl[:, icol]))
+            # candidate_cuts_selector = (candidate_cuts[icol] < np.max(self.features_excl[:, icol])) & \
+            #                           (candidate_cuts[icol] > np.min(self.features_excl[:, icol]))
+            candidate_cuts_selector = (candidate_cuts[icol] < np.max(self.data_info.features[self.indices_excl][:, icol])) & \
+                                      (candidate_cuts[icol] > np.min(self.data_info.features[self.indices_excl][:, icol]))
             candidate_cuts_icol = candidate_cuts[icol][candidate_cuts_selector]
         else:
-            candidate_cuts_selector = (candidate_cuts[icol] < np.max(self.features[:, icol])) & \
-                                      (candidate_cuts[icol] > np.min(self.features[:, icol]))
+            # candidate_cuts_selector = (candidate_cuts[icol] < np.max(self.features[:, icol])) & \
+            #                           (candidate_cuts[icol] > np.min(self.features[:, icol]))
+            candidate_cuts_selector = (candidate_cuts[icol] < np.max(self.data_info.features[self.indices][:, icol])) & \
+                                      (candidate_cuts[icol] > np.min(self.data_info.features[self.indices][:, icol]))
             candidate_cuts_icol = candidate_cuts[icol][candidate_cuts_selector]
         return candidate_cuts_icol
 
@@ -170,6 +187,7 @@ class Rule:
         ---
         None
         """
+
         # Calculate the MDL gain
         info_theo_scores = self.calculate_mdl_gain(bi_array=bi_array, excl_bi_array=excl_bi_array,
                                                    icol=icol, cut_option=cut_option)
@@ -211,50 +229,61 @@ class Rule:
         ---
         None
         """
+        if self.printing:
+            print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - rule.grow")
+
         candidate_cuts = self.data_info.candidate_cuts
 
         # Consider each feature
         for icol in range(self.data_info.ncol):
             candidate_cuts_icol = self.get_candidate_cuts_icol_given_rule(candidate_cuts, icol)
+            bi_array = self.data_info.features[:, icol]
 
             # Consider every candidate cut point
             for i, cut in enumerate(candidate_cuts_icol):
+                # if self.printing:
+                #     print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - rule.grow. feature: {icol} / {self.data_info.ncol}, cut: {i} / {len(candidate_cuts_icol)}")
                 
+                # Construct binary arrays indicating which features fall on each side of the cut
+                # excl_left_bi_array = (self.features_excl[:, icol] < cut)
+                self.excl_left_bi_array = (bi_array[self.indices_excl] < cut)
+                self.excl_right_bi_array = ~self.excl_left_bi_array
+                # left_bi_array = (self.features[:, icol] < cut)
+                self.left_bi_array = (bi_array[self.indices] < cut)
+                self.right_bi_array = ~self.left_bi_array
+
                 # Check validity and skip if not valid
-                _validity = RuleGrowConstraint.validity_check(rule=self, icol=icol, cut=cut)
+                _validity = self.validity_check(icol=icol, cut=cut)
+
                 if self.data_info.not_use_excl_:
                     _validity["res_excl"] = False
 
                 if _validity["res_excl"] == False and _validity["res_incl"] == False:
                     continue
 
-                # Construct binary arrays indicating which features fall on each side of the cut
-                excl_left_bi_array = (self.features_excl[:, icol] < cut)
-                excl_right_bi_array = ~excl_left_bi_array
-                left_bi_array = (self.features[:, icol] < cut)
-                right_bi_array = ~left_bi_array
-
-                incl_left_coverage, incl_right_coverage = np.count_nonzero(left_bi_array), np.count_nonzero(
-                    right_bi_array)
-                excl_left_coverage, excl_right_coverage = np.count_nonzero(excl_left_bi_array), np.count_nonzero(
-                    excl_right_bi_array)
+                incl_left_coverage, incl_right_coverage = np.count_nonzero(self.left_bi_array), np.count_nonzero(
+                    self.right_bi_array)
+                excl_left_coverage, excl_right_coverage = np.count_nonzero(self.excl_left_bi_array), np.count_nonzero(
+                    self.excl_right_bi_array)
 
                 # Question: Why is there no check on incl_coverage being 0?
                 if excl_left_coverage == 0 or excl_right_coverage == 0:
                     continue
 
                 # Update the beam with the results. We do this twice, because a cut can be < or >
-                self.update_grow_beam(bi_array=left_bi_array, excl_bi_array=excl_left_bi_array, icol=icol,
+                self.update_grow_beam(bi_array=self.left_bi_array, excl_bi_array=self.excl_left_bi_array, icol=icol,
                                       cut=cut, cut_option=constant.LEFT_CUT,
                                       incl_coverage=incl_left_coverage, excl_coverage=excl_left_coverage,
                                       grow_info_beam=grow_info_beam, grow_info_beam_excl=grow_info_beam_excl,
                                       _validity=_validity)
 
-                self.update_grow_beam(bi_array=right_bi_array, excl_bi_array=excl_right_bi_array, icol=icol,
+                self.update_grow_beam(bi_array=self.right_bi_array, excl_bi_array=self.excl_right_bi_array, icol=icol,
                                       cut=cut, cut_option=constant.RIGHT_CUT,
                                       incl_coverage=incl_right_coverage, excl_coverage=excl_right_coverage,
                                       grow_info_beam=grow_info_beam, grow_info_beam_excl=grow_info_beam_excl,
                                       _validity=_validity)
+
+                del self.excl_left_bi_array, self.excl_right_bi_array, self.left_bi_array, self.right_bi_array
 
 
     def calculate_mdl_gain(self, bi_array, excl_bi_array, icol, cut_option):
@@ -276,6 +305,7 @@ class Rule:
           : dict
             Containing codelengths and gains for this split
         """
+
         data_encoding, model_encoding = self.ruleset.data_encoding, self.ruleset.model_encoding
 
         cl_model = model_encoding.cl_model_after_growing_rule(rule=self, ruleset=self.ruleset, icol=icol,
@@ -288,6 +318,133 @@ class Rule:
 
         return {"cl_model": cl_model, "cl_data": cl_data, "cl_data_excl": cl_data_excl,
                 "absolute_gain": absolute_gain, "absolute_gain_excl": absolute_gain_excl}
+
+    def validity_check(self, icol, cut):
+        """ Control function for validity check
+
+        
+        Parameters
+        ---
+        rule : Rule object
+            Rule to be checked
+        icol : int
+            Index of the column for which the candidate cut is calculated
+        cut : float
+            Candidate cut
+        
+        Returns
+        ---
+        : dict
+            contains the validity including and excluding overlapping instances
+        """
+        res_excl = True
+        res_incl = True
+        if self.data_info.alg_config.validity_check == "no_check":
+            pass
+        elif self.data_info.alg_config.validity_check == "excl_check":
+            res_excl = self.check_split_validity_excl(icol, cut)
+        elif self.data_info.alg_config.validity_check == "incl_check":
+            res_incl = self.check_split_validity(icol, cut)
+        elif self.data_info.alg_config.validity_check == "either":
+            res_excl = self.check_split_validity_excl(icol, cut)
+            res_incl = self.check_split_validity(icol, cut)
+        else:
+            # TODO: I should improve this error message a bit
+            sys.exit("Error: the if-else statement should not end up here")
+        return {"res_excl": res_excl, "res_incl": res_incl}
+
+    def check_split_validity(self, icol, cut):
+        """ Check validity when considering overlapping instances
+        
+        Parameters
+        ---
+        rule : Rule object
+            Rule to be checked
+        icol : int
+            Index of the column for which the candidate cut is calculated
+        cut : float
+            Candidate cut
+        
+        Returns
+        ---
+        : bool
+            Whether the split is valid
+        """
+        # indices_left, indices_right = rule.indices[rule.features[:, icol] < cut], rule.indices[rule.features[:, icol] >= cut]
+        # indices_left, indices_right = self.indices[self.data_info.features[self.indices][:, icol] < cut], self.indices[self.data_info.features[self.indices][:, icol] >= cut]
+        indices_left, indices_right = np.where(self.left_bi_array)[0], np.where(self.right_bi_array)[0]
+
+        # Compute probabilities for the coverage of the rule and both sides of the split
+        p_left = utils_calculating_cl.calc_probs(self.data_info.target[indices_left], self.data_info.num_class)
+        p_right = utils_calculating_cl.calc_probs(self.data_info.target[indices_right], self.data_info.num_class)
+
+        # Compute the negative log-likelihoods for these probabilities
+        # Compute the negative log-likelihoods for these probabilities
+        nll_rule = utils_calculating_cl.calc_negloglike(self.prob, self.coverage)
+        nll_left = utils_calculating_cl.calc_negloglike(p_left, len(indices_left))
+        nll_right = utils_calculating_cl.calc_negloglike(p_right, len(indices_right))
+
+        # The extra model code length this split would add
+        cl_model_extra = self.ruleset.model_encoding.cached_cl_model["l_cut"][0][icol]  # 0 represents for the "one split cut", instead of "two-splits cut"
+        cl_model_extra += np.log2(self.ruleset.model_encoding.data_ncol_for_encoding)
+        num_vars = np.sum(self.condition_bool > 0)
+        cl_model_extra += self.ruleset.model_encoding.cached_cl_model["l_number_of_variables"][num_vars + 1] - \
+                        self.ruleset.model_encoding.cached_cl_model["l_number_of_variables"][num_vars]
+
+        # if this validity score is positive, the split decreases the total code length
+        validity = nll_rule + nml_regret.regret(self.coverage, self.data_info.num_class) \
+                    - nll_left - nml_regret.regret(len(indices_left), self.data_info.num_class) \
+                    - nll_right - nml_regret.regret(len(indices_right), self.data_info.num_class) \
+                    - cl_model_extra
+
+        return (validity > 0)
+
+        
+
+    def check_split_validity_excl(self, icol, cut):
+        """ Check validity without considering overlapping instances
+        
+        Parameters
+        ---
+        rule : Rule object
+            Rule to be checked
+        icol : int
+            Index of the column for which the candidate cut is calculated
+        cut : float
+            Candidate cut
+        
+        Returns
+        ---
+        : bool
+            Whether the split is valid
+        """
+        # indices_left, indices_right = rule.indices_excl[rule.features_excl[:, icol] < cut], rule.indices_excl[rule.features_excl[:, icol] >= cut]
+        # indices_left, indices_right = self.indices_excl[self.data_info.features[self.indices_excl][:, icol] < cut], self.indices_excl[self.data_info.features[self.indices_excl][:, icol] >= cut]
+        indices_left, indices_right = np.where(self.excl_left_bi_array)[0], np.where(self.excl_right_bi_array)[0]
+
+        # Compute probabilities for the coverage of the rule and both sides of the split
+        p_left = utils_calculating_cl.calc_probs(self.data_info.target[indices_left], self.data_info.num_class)
+        p_right = utils_calculating_cl.calc_probs(self.data_info.target[indices_right], self.data_info.num_class)
+
+        # Compute the negative log-likelihoods for these probabilities
+        nll_rule = utils_calculating_cl.calc_negloglike(self.prob_excl, self.coverage_excl)
+        nll_left = utils_calculating_cl.calc_negloglike(p_left, len(indices_left))
+        nll_right = utils_calculating_cl.calc_negloglike(p_right, len(indices_right))
+
+        # The extra model code length this split would add
+        cl_model_extra = self.ruleset.model_encoding.cached_cl_model["l_cut"][0][icol]  # 0 represents for the "one split cut", instead of "two-splits cut"
+        cl_model_extra += np.log2(self.ruleset.model_encoding.data_ncol_for_encoding)
+        num_vars = np.sum(self.condition_bool > 0)
+        cl_model_extra += self.ruleset.model_encoding.cached_cl_model["l_number_of_variables"][num_vars + 1] - \
+                        self.ruleset.model_encoding.cached_cl_model["l_number_of_variables"][num_vars]
+
+        # if this validity score is positive, the split decreases the total code length
+        validity = nll_rule + nml_regret.regret(self.coverage_excl, self.data_info.num_class) \
+                    - nll_left - nml_regret.regret(len(indices_left), self.data_info.num_class) \
+                    - nll_right - nml_regret.regret(len(indices_right), self.data_info.num_class) \
+                    - cl_model_extra
+
+        return (validity > 0)
 
     def __str__(self):
         """ String representation of the rule for printing

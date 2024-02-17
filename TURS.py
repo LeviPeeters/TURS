@@ -70,10 +70,11 @@ class TURS():
         self.ruleset = Ruleset.Ruleset(
             data_info=data_info, 
             data_encoding=data_encoding, 
-            model_encoding=model_encoding
+            model_encoding=model_encoding,
+            printing=printing
         )
 
-        self.ruleset.fit(max_iter=1000, printing=printing)
+        self.ruleset.fit(max_iter=1000)
     
         return self.ruleset
 
