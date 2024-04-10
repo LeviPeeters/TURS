@@ -1,6 +1,4 @@
 import numpy as np
-from datetime import datetime
-from time import sleep
 import sys
 
 import utils_calculating_cl
@@ -34,10 +32,7 @@ class Rule:
                  ruleset,
                  mdl_gain, 
                  mdl_gain_excl, 
-                 icols_in_order,
-                 printing):
-        if printing:
-            print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - rule.__init__")       
+                 icols_in_order):  
 
         self.ruleset = ruleset
         self.data_info = data_info # Metadata
@@ -80,9 +75,6 @@ class Rule:
 
         self.mdl_gain = mdl_gain
         self.mdl_gain_excl = mdl_gain_excl
-
-        self.printing = printing
-
 
         if self.rule_base is None:
             self.incl_mdl_gain, self.excl_mdl_gain = -np.Inf, -np.Inf
@@ -229,8 +221,6 @@ class Rule:
         ---
         None
         """
-        if self.printing:
-            print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - rule.grow")
 
         candidate_cuts = self.data_info.candidate_cuts
 

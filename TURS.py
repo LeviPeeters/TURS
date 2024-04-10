@@ -61,7 +61,7 @@ class TURS():
             "run_uci.*",
         ]
 
-    def fit(self, X_train, y_train, printing=True):
+    def fit(self, X_train, y_train):
         data_info = DataInfo.DataInfo(X=X_train, y=y_train, beam_width=None, alg_config=self.alg_config)
 
         data_encoding = DataEncoding.NMLencoding(data_info)
@@ -70,8 +70,7 @@ class TURS():
         self.ruleset = Ruleset.Ruleset(
             data_info=data_info, 
             data_encoding=data_encoding, 
-            model_encoding=model_encoding,
-            printing=printing
+            model_encoding=model_encoding
         )
 
         self.ruleset.fit(max_iter=1000)

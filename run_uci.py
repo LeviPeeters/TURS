@@ -23,7 +23,7 @@ import utils
 np.seterr(all='raise')
 
 h = hpy()
-make_call_graph = True
+make_call_graph = False
 log_learning_process = True
 
 exp_res_alldata = []
@@ -109,7 +109,7 @@ for fold in range(5):
         ]
         utils.call_graph_filtered(ruleset.fit, "call_graph.png", custom_include=custom_include)
     else:
-        ruleset.fit(max_iter=1000, printing=True)
+        ruleset.fit(max_iter=1000)
     
     if first_run:
         print(ruleset)

@@ -4,10 +4,10 @@
 import numpy as np
 import os
 from datetime import datetime
+import logging
 
 import utils_namedtuple
 import utils_calculating_cl
-import utils_modelencoding
 
 class DataInfo:
     def __init__(self, X, y, beam_width=None, alg_config=None, not_use_excl_=None):
@@ -79,17 +79,18 @@ class DataInfo:
             time = datetime.now().strftime("%Y-%m-%d_%H-%M")
             if self.alg_config.log_folder_name:
                 os.mkdir(f"logs/{self.alg_config.log_folder_name}")
-                self.logfile = open(f"logs/{self.alg_config.log_folder_name}/log.txt", "a")
+                logging.basicConfig(filename=f"logs/{self.alg_config.log_folder_name}/log.txt", encoding='utf-8', level=logging.INFO, format='%(asctime)s %(message)s')
             else:
                 os.mkdir(f"logs/{time}")
-                self.logfile = open(f"logs/{time}/log.txt", "a")
+                logging.basicConfig(filename=f"logs/{time}/log.txt", encoding='utf-8', level=logging.DEBUG, format='%(asctime)s %(message)s')
 
             # Write the configuration to the log file
-            self.logfile.write(f"Log for learning process at {time}\n")
-            self.logfile.write(f"Algorithm Configuration:")
+            logging.info(f"Log for learning process at {time}\n")
+            logging.info(f"Algorithm Configuration:")
             for key, value in self.alg_config._asdict().items():
                 if key != "feature_names":
-                    self.logfile.write(f"{key}: {value}\n")
+                    logging.info(f"{key}: {value}")
+            logging.info("\n")
 
     
     def candidate_cuts_quantile_midpoints(self, num_candidate_cuts):
