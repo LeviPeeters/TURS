@@ -11,6 +11,7 @@ from guppy import hpy
 
 from sklearn.model_selection import StratifiedKFold
 
+<<<<<<< HEAD
 import DataInfo 
 import Ruleset
 import ModelEncoding
@@ -19,12 +20,20 @@ import DataEncoding
 import utils_dataprep
 import utils_namedtuple
 import utils
+=======
+import TURS
+import utils_dataprep
+>>>>>>> multithreading
 
 np.seterr(all='raise')
+print("Running TURS with multithreading")
 
 h = hpy()
+<<<<<<< HEAD
 make_call_graph = False
 log_learning_process = True
+=======
+>>>>>>> multithreading
 
 exp_res_alldata = []
 date_and_time = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -66,8 +75,12 @@ for fold in range(5):
     y_test = dtest.iloc[:, -1].to_numpy()
 
     start_time = time.time()
-    alg_config = utils_namedtuple.AlgConfig(
-        num_candidate_cuts=20, max_num_rules=500, max_grow_iter=500, num_class_as_given=None,
+    
+    turs = TURS(
+        num_candidate_cuts=20,
+        max_num_rules=500,
+        max_grow_iter=500,
+        num_class_as_given=None,
         beam_width=10,
         log_learning_process=True and first_run,
         log_folder_name=datetime.now().strftime("%Y%m%d_%H%M%s") + "_" + data_name,
@@ -77,15 +90,6 @@ for fold in range(5):
         random_seed=None,
         label_names=class_labels,
         validity_check="either"
-        )
-    data_info = DataInfo.DataInfo(X=X_train, y=y_train, beam_width=None, alg_config=alg_config)
-
-    data_encoding = DataEncoding.NMLencoding(data_info)
-    model_encoding = ModelEncoding.ModelEncodingDependingOnData(data_info)
-    ruleset = Ruleset.Ruleset(
-        data_info=data_info, 
-        data_encoding=data_encoding, 
-        model_encoding=model_encoding
     )
 
     if make_call_graph:

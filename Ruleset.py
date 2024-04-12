@@ -2,6 +2,9 @@ import numpy as np
 import os
 from datetime import datetime
 import logging
+from threading import Thread
+from memory_profiler import profile
+from guppy import hpy
 
 import Rule
 import Beam
@@ -26,6 +29,7 @@ def make_rule_from_grow_info(grow_info):
     """
 
     rule = grow_info["_rule"]
+
     indices = rule.indices[grow_info["incl_bi_array"]]
     indices_excl = rule.indices_excl[grow_info["excl_bi_array"]]
 
@@ -112,6 +116,8 @@ class Ruleset:
         else:
             self.constraints = constraints
 
+        
+        self.hp = hpy()
         
         
 
@@ -272,7 +278,7 @@ class Ruleset:
         condition3 = len(excl_beam.gains) > 0 and len(incl_beam.gains) > 0 and np.max(incl_beam.gains) < 0 and np.max(excl_beam.gains) < 0
         return (condition1 and condition2) or condition3
 
-    def combine_beams(self, incl_beam_list, excl_beam_list):
+    def combine_beams(self, beam_list, incl_or_excl):
         """ Receives a list of beams, each containing the information from a grow step for a rule that's being grown
         Finds the best rule in each coverage interval over all beams
         
@@ -292,39 +298,26 @@ class Ruleset:
         """
         logging.info(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - ruleset.combine_beams")
 
-        infos_incl, infos_excl = [], []
-        coverages_incl, coverages_excl = [], []
+        infos = []
+        coverages = []
 
-        # First, we combine the info and coverage lists for the incl beam
-        for incl_beam in incl_beam_list:
-            infos_incl.extend([info for info in incl_beam.infos.values() if info is not None])
-            coverages_incl.extend([info["coverage_incl"] for info in incl_beam.infos.values() if info is not None])
+        # First, we combine the info and coverage lists 
+        for beam in beam_list:
+            infos.extend([info for info in beam.infos.values() if info is not None])
+            coverages.extend([info[f"coverage_{incl_or_excl}"] for info in beam.infos.values() if info is not None])
         
         # Argsort the coverage lists
-        argsorted_coverages_incl = np.argsort(coverages_incl)
-        groups_coverages_incl = np.array_split([infos_incl[i] for i in argsorted_coverages_incl], self.data_info.beam_width)
+        argsorted_coverages = np.argsort(coverages)
+        groups_coverages = np.array_split([infos[i] for i in argsorted_coverages], self.data_info.beam_width)
 
         # Now we find the best info for each group
-        final_info_incl = []
-        for group in groups_coverages_incl:
+        final_info = []
+        for group in groups_coverages:
             if len(group) == 0:
                 continue
-            final_info_incl.append(group[np.argmax([info["normalized_gain_incl"] for info in group])])
-
-        # Repeat the process for the excl beam
-        for excl_beam in excl_beam_list:
-            infos_excl.extend([info for info in excl_beam.infos.values() if info is not None])
-            coverages_excl.extend([info["coverage_excl"] for info in excl_beam.infos.values() if info is not None])
-        argsorted_coverages_excl = np.argsort(coverages_excl)
-        groups_coverages_excl = np.array_split([infos_excl[i] for i in argsorted_coverages_excl], self.data_info.beam_width)
+            final_info.append(group[np.argmax([info[f"normalized_gain_{incl_or_excl}"] for info in group])])
         
-        final_info_excl = []
-        for group in groups_coverages_excl:
-            if len(group) == 0:
-                continue
-            final_info_excl.append(group[np.argmax([info["normalized_gain_excl"] for info in group])])
-        
-        return final_info_incl, final_info_excl
+        return final_info
 
     def search_next_rule(self, 
                          k_consecutively, 
@@ -371,32 +364,28 @@ class Ruleset:
                 logging.info(f"    Number of rules for this iteration: {len(rules_for_next_iter)}")
                 logging.info(f"    Total number of candidates: {len(rules_candidates)}")
 
-            excl_beam_list, incl_beam_list = [], []
+            final_beams = {}
 
-            # For each rule, initialize a beam and put information for a grow step in it
-            for rule in rules_for_next_iter:
-                excl_beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
-                incl_beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
-                rule.grow(grow_info_beam=incl_beam, grow_info_beam_excl=excl_beam)
-                excl_beam_list.append(excl_beam)
-                incl_beam_list.append(incl_beam)
+            # Create threads to search for the best rule in the incl and excl beams
+            threads = [
+                Thread(target=self.search_rule_incl_or_excl, args=(rules_for_next_iter, "incl", final_beams)),
+                Thread(target=self.search_rule_incl_or_excl, args=(rules_for_next_iter, "excl", final_beams))
+            ]
             
-            # Combine the beams and make GrowInfoBeam objects to store them
-            final_info_incl, final_info_excl = self.combine_beams(incl_beam_list, excl_beam_list)
-            final_incl_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
-            final_excl_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+            # Start the threads
+            for t in threads:
+                t.start()
 
-            for info in final_info_incl:
-                final_incl_beam.update(info, info["normalized_gain_incl"])
-            for info in final_info_excl:
-                final_excl_beam.update(info, info["normalized_gain_excl"])
+            # Don't continue until both threads are finished
+            for t in threads:
+                t.join()
 
             # If the beams are empty, stop the search
-            if len(final_incl_beam.gains) == 0 and len(final_excl_beam.gains) == 0:
+            if len(final_beams["incl"].gains) == 0 and len(final_beams["excl"].gains) == 0:
                 break
 
             # If the stop condition is met, increment the counter
-            stop_condition_element = self.calculate_stop_condition_element(final_incl_beam, final_excl_beam, previous_best_gain, previous_best_excl_gain)
+            stop_condition_element = self.calculate_stop_condition_element(final_beams["incl"], final_beams["excl"], previous_best_gain, previous_best_excl_gain)
             
             if stop_condition_element:
                 counter_worse_best_gain = counter_worse_best_gain + 1
@@ -404,20 +393,108 @@ class Ruleset:
                 counter_worse_best_gain = 0
 
             # If we found a rule with better gain, store it
-            if len(final_incl_beam.gains) > 0:
-                previous_best_gain = np.max(final_incl_beam.gains)
-            if len(final_excl_beam.gains) > 0:
-                previous_best_excl_gain = np.max(final_excl_beam.gains)
+            if len(final_beams["incl"].gains) > 0:
+                previous_best_gain = np.max(final_beams["incl"].gains)
+            if len(final_beams["excl"].gains) > 0:
+                previous_best_excl_gain = np.max(final_beams["excl"].gains)
+            
 
             # Stop the search if we find no improvement in k_consecutively iterations
             if counter_worse_best_gain > k_consecutively:
                 break
             else:
-                rules_for_next_iter = extract_rules_from_beams([final_excl_beam, final_incl_beam])
+                rules_for_next_iter = extract_rules_from_beams([final_beams["excl"], final_beams["incl"]])
                 rules_candidates.extend(rules_for_next_iter)
-
+        
         which_best_ = np.argmax([r.incl_gain_per_excl_coverage for r in rules_candidates])
         return rules_candidates[which_best_]
+    
+    def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+        beam_list = []
+        for rule in rules_for_next_iter:
+            beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
+            rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+            beam_list.append(beam)
+ 
+        # Combine the beams and make GrowInfoBeam objects to store them
+        final_info = self.combine_beams(beam_list, incl_or_excl)
+        final_beam = Beam.GrowInfoBeam(width=self.data_info.beam_width)
+
+        for info in final_info:
+            final_beam.update(info, info[f"normalized_gain_{incl_or_excl}"])
+        
+        final_beams[incl_or_excl] = final_beam
+
+    def predict_ruleset(self, X_test):
+        """ This function computes the local prediction using a ruleset, given a test set.
+        
+        Parameters
+        ----------
+        ruleset : RuleSet
+            The ruleset for which we want to compute the local prediction.
+        X_test : np.array
+            The test set.
+        
+        Returns
+        -------
+        : Array
+            Probability distributions for the prediction
+        """
+        if type(X_test) != np.ndarray:
+            X_test = X_test.to_numpy()
+
+        prob_predicted = np.zeros((len(X_test), self.data_info.num_class), dtype=float)
+        cover_matrix = np.zeros((len(X_test), len(self.rules) + 1), dtype=bool)
+
+        test_uncovered_bool = np.ones(len(X_test), dtype=bool)
+        for ir, rule in enumerate(self.rules):
+            r_bool_array = np.ones(len(X_test), dtype=bool)
+
+            condition_matrix = np.array(rule.condition_matrix)
+            condition_bool = np.array(rule.condition_bool)
+            which_vars = np.where(condition_bool > 0)[0]
+
+            upper_bound, lower_bound = condition_matrix[0], condition_matrix[1]
+            upper_bound[np.isnan(upper_bound)] = np.Inf
+            lower_bound[np.isnan(lower_bound)] = -np.Inf
+
+            for v in which_vars:
+                r_bool_array = r_bool_array & (X_test[:, v] < upper_bound[v]) & (X_test[:, v] >= lower_bound[v])
+
+            cover_matrix[:, ir] = r_bool_array
+            test_uncovered_bool = test_uncovered_bool & ~r_bool_array
+        cover_matrix[:, -1] = test_uncovered_bool
+
+        # From chatGPT: "I use dtype=object to allow the elements of powers_of_2 and binary_vector to be Python integers which can handle arbitrary large values."
+        # That is, by using "object", the element of numpy array becomes Python Int, instead of numpy.int64;
+        cover_matrix_int = cover_matrix.astype(int)
+        unique_id = np.zeros(len(X_test), dtype=object)
+        power_of_two = 2 ** np.arange(cover_matrix_int.shape[1], dtype=object)
+        for kol in range(cover_matrix_int.shape[1]):
+            # unique_id += 2 ** kol * cover_matrix_int[:, kol]    # This may fail when 2 ** kol becomes very large
+            unique_id += power_of_two[kol] * cover_matrix_int[:, kol].astype(object)
+
+        groups, ret_index = np.unique(unique_id, return_index=True)
+        unique_id_dir = {}
+        for g, rind in zip(groups, ret_index):
+            unique_id_dir[g] = cover_matrix_int[rind]
+
+        unique_id_prob_dir = {}
+        for z, t in unique_id_dir.items():
+            bool_model = np.zeros(len(self.data_info.target), dtype=bool)
+            for i_tt, tt in enumerate(t):
+                if tt == 1:
+                    if i_tt == len(self.rules):
+                        bool_model = self.uncovered_bool
+                    else:
+                        bool_model = np.bitwise_or(bool_model, self.rules[i_tt].bool_array)
+            unique_id_prob_dir[z] = utils_calculating_cl.calc_probs(self.data_info.target[bool_model],
+                                            self.data_info.num_class)
+
+        for i in range(len(prob_predicted)):
+            prob_predicted[i] = unique_id_prob_dir[unique_id[i]]
+
+        return prob_predicted
 
     def predict_ruleset(self, X_test):
         """ This function computes the local prediction using a ruleset, given a test set.
