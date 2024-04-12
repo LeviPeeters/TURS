@@ -12,13 +12,7 @@ from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 from sklearn.metrics import roc_auc_score, precision_recall_curve, f1_score, auc, log_loss
 from sklearn.model_selection import StratifiedKFold
 
-import DataInfo
-import Ruleset
-import utils_predict
-import ModelEncoding
-import DataEncoding
-
-import exp_utils
+from scipy.sparse import hstack, csr_matrix, csc_matrix
 
 def read_data(data_name):
     """ Read data from one of the standard datasets into a Pandas DataFrame
@@ -99,6 +93,42 @@ def preprocess_data(d):
     d = pd.concat([d_feature, d.iloc[:, -1]], axis=1)
 
     return d, unique_labels
+
+def preprocess_sparse(df):
+    """ Use a LabelEncoder to encode the labels and a OneHotEncoder to encode features 
+    Assumes that the labels are in the last column of the dataframe
+    Stores all features in a sparse matrix, including numerical ones
+    TODO: It is better to store the numerical features in a dense matrix, as they are not sparse
+    
+    Parameters
+    ---
+    d : Dataframe
+        Contains data that has just been read
+
+    Returns
+    ---
+    d : NumPy array
+        Preprocessed data
+
+    """
+    df = df.reset_index().drop("index", axis=1)
+
+    le = LabelEncoder()
+    df.iloc[:, -1] = le.fit_transform(df.iloc[:, -1])
+    unique_labels = le.classes_
+
+    ohe = OneHotEncoder(sparse_output=True, dtype=np.int, drop="if_binary")#, feature_name_combiner="concat")
+    
+    for icol in range(df.shape[1] - 1):
+        d_transformed = ohe.fit_transform(df.iloc[:, icol:(icol+1)])
+
+        # Add the transformed feature to the preprocessed dataframe
+        if icol == 0:
+            X = d_transformed
+        else:
+            X = hstack((X, d_transformed)) # Note, this is the scipy hstack, not the numpy hstack
+
+    return X[:,:-1], X[:,-1], unique_labels
 
 def calculate_roc_auc_logloss(ruleset, y_test, y_pred_prob, y_train, y_pred_prob_train):
     """ Calculate various evaluation metrics using sklearn 

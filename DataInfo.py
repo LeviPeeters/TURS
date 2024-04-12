@@ -5,6 +5,7 @@ import numpy as np
 import os
 from datetime import datetime
 import logging
+from scipy.sparse import csc_array
 
 import utils_namedtuple
 import utils_calculating_cl
@@ -27,16 +28,22 @@ class DataInfo:
 
         self.not_use_excl_ = not_use_excl_
 
-        # Make sure X and y are numpy arrays
-        if type(X) != np.ndarray:
-            self.features = X.to_numpy()
-        else:
-            self.features = X
+        # # Make sure X and y are numpy arrays
+        # if type(X) != np.ndarray:
+        #     self.features = X.to_numpy()
+        # else:
+        #     self.features = X
+        # self.features = csr_array(self.features)
 
-        if type(y) != np.ndarray:
-            self.target = y.to_numpy().flatten()
-        else:
-            self.target = y
+        # if type(y) != np.ndarray:
+        #     self.target = y.to_numpy().flatten()
+        # else:
+        #     self.target = y
+
+        self.features = csc_array(X) # Sparse matrix
+        self.target = y
+
+        assert type(self.target) == np.ndarray
 
         # Parameters to be stored internally
         self.max_grow_iter = self.alg_config.max_grow_iter
@@ -114,7 +121,10 @@ class DataInfo:
             num_candidate_cuts = [num_candidate_cuts] * self.ncol
         
         for i, feature in enumerate(self.features.T):
-            unique_feature = np.unique(feature)
+            # We make the feature dense to avoid issues with sparse matrix indexing
+            unique_feature = np.unique(feature.todense())
+            # print(unique_feature)
+            # breakpoint()
             if len(unique_feature) <= 1:
                 # This can happen because of cross-validation
                 candidate_cut_this_dimension = np.array([], dtype=float)
@@ -124,7 +134,7 @@ class DataInfo:
                 candidate_cuts[i] = np.array([0.5])
             else:
                 # Sort the list and ensure no duplicate values. Duplicates can cause the quantiles to not be the same size
-                sort_feature = np.sort(feature+np.random.uniform(0, 1e-10, len(feature)))
+                sort_feature = np.sort(feature.todense()+np.random.uniform(0, 1e-10, feature.shape[0])).flatten()
 
                 # Calculate the midpoints between consecutive values
                 midpoints = (sort_feature[:-1] + sort_feature[1:]) / 2
@@ -140,5 +150,4 @@ class DataInfo:
                     candidate_cuts[i] = midpoints[select_indices]
                 else:
                     candidate_cuts[i] = midpoints
-
         return candidate_cuts

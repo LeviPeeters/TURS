@@ -16,7 +16,7 @@ import Ruleset
 import ModelEncoding
 import DataEncoding
 
-import exp_predictive_perf
+import utils_dataprep
 import utils_namedtuple
 import utils
 
@@ -39,8 +39,8 @@ else:
     data_name = "iris"
     fold_given = 0
 
-d = exp_predictive_perf.read_data(data_name)
-d, class_labels = exp_predictive_perf.preprocess_data(d)
+d = utils_dataprep.read_data(data_name)
+d, class_labels = utils_dataprep.preprocess_data(d)
 
 X = d.iloc[:, :d.shape[1] - 1].to_numpy()
 y = d.iloc[:, d.shape[1] - 1].to_numpy()
@@ -70,7 +70,7 @@ for fold in range(5):
         num_candidate_cuts=20, max_num_rules=500, max_grow_iter=500, num_class_as_given=None,
         beam_width=10,
         log_learning_process=True and first_run,
-        log_folder_name=datetime.now().strftime("%Y%m%d_%H%M") + "_" + data_name,
+        log_folder_name=datetime.now().strftime("%Y%m%d_%H%M%s") + "_" + data_name,
         dataset_name=None,
         feature_names=d.columns[:-1],
         which_features=None,
@@ -118,18 +118,18 @@ for fold in range(5):
     times.append(end_time - start_time)
 
     ## ROC_AUC and log-loss
-    exp_res = exp_predictive_perf.calculate_exp_res(ruleset, X_test, y_test, X_train, y_train, data_name, fold, start_time, end_time)
-    exp_res_alldata.append(exp_res)
+    # exp_res = exp_predictive_perf.calculate_exp_res(ruleset, X_test, y_test, X_train, y_train, data_name, fold, start_time, end_time)
+    # exp_res_alldata.append(exp_res)
 
     first_run = False
 
-exp_res_df = pd.DataFrame(exp_res_alldata)
+# exp_res_df = pd.DataFrame(exp_res_alldata)
 print(f"Mean time: {np.mean(times)}")
 
-folder_name = "exp_uci_" + date_and_time[:8]
-os.makedirs(folder_name, exist_ok=True)
-if fold_given is None:
-    res_file_name = "./" + folder_name + "/" + date_and_time + "_" + data_name + "_uci_datasets_res.csv"
-else:
-    res_file_name = "./" + folder_name + "/" + date_and_time + "_" + data_name + "_fold" + str(fold_given) + "_uci_datasets_res.csv"
-exp_res_df.to_csv(res_file_name, index=False)
+# folder_name = "exp_uci_" + date_and_time[:8]
+# os.makedirs(folder_name, exist_ok=True)
+# if fold_given is None:
+#     res_file_name = "./" + folder_name + "/" + date_and_time + "_" + data_name + "_uci_datasets_res.csv"
+# else:
+#     res_file_name = "./" + folder_name + "/" + date_and_time + "_" + data_name + "_fold" + str(fold_given) + "_uci_datasets_res.csv"
+# exp_res_df.to_csv(res_file_name, index=False)

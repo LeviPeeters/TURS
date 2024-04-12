@@ -33,7 +33,7 @@ class TURS():
             num_class_as_given=None,
             beam_width=10,
             log_learning_process=log_learning_process,
-            log_folder_name=f"{datetime.now().strftime('%Y%m%d_%H%M')}_{dataset_name}",
+            log_folder_name=f"{datetime.now().strftime('%Y%m%d_%H%M%s')}_{dataset_name}",
             dataset_name=None,
             feature_names=feature_names,
             label_names=label_names,

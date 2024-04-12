@@ -120,11 +120,11 @@ class ModelEncodingDependingOnData:
         l_num_variables = self.cached_cl_model["l_number_of_variables"][num_variables]
         l_which_variables = self.cached_cl_model["l_which_variables"][num_variables]
 
-        bool_ = np.ones(len(self.data_info.features), dtype=bool)
+        bool_ = np.ones(self.data_info.features.shape[0], dtype=bool)
         l_cuts = 0
         for index, col in enumerate(col_orders):
             # Calculate the bounds of this feature for the remaining data
-            up_bound, low_bound = np.max(self.data_info.features[bool_, col]), np.min(self.data_info.features[bool_, col])
+            up_bound, low_bound = np.max(self.data_info.features[bool_, [col]].flatten()), np.min(self.data_info.features[bool_, [col]].flatten())
             num_cuts = np.count_nonzero((self.data_info.candidate_cuts[col] >= low_bound) &
                                         (self.data_info.candidate_cuts[col] <= up_bound))  # only an approximation here.
             
@@ -146,12 +146,12 @@ class ModelEncodingDependingOnData:
                 assert condition_count[col] == 1 or condition_count[col] == 2
                 if condition_count[col] == 1:
                     if not np.isnan(condition_matrix[0, col]):
-                        bool_ = bool_ & (self.data_info.features[:, col] <= condition_matrix[0, col])
+                        bool_ = bool_ & (self.data_info.features[:, [col]].todense().flatten() <= condition_matrix[0, col])
                     else:
-                        bool_ = bool_ & (self.data_info.features[:, col] > condition_matrix[1, col])
+                        bool_ = bool_ & (self.data_info.features[:, [col]].todense().flatten() > condition_matrix[1, col])
                 else:
-                    bool_ = bool_ & ((self.data_info.features[:, col] <= condition_matrix[0, col]) &
-                                     (self.data_info.features[:, col] > condition_matrix[1, col]))
+                    bool_ = bool_ & ((self.data_info.features[:, [col]].todense().flatten() <= condition_matrix[0, col]) &
+                                     (self.data_info.features[:, [col]].todense().flatten() > condition_matrix[1, col]))
 
         return l_num_variables + l_which_variables + l_cuts
 

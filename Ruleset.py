@@ -421,6 +421,7 @@ class Ruleset:
 
     def predict_ruleset(self, X_test):
         """ This function computes the local prediction using a ruleset, given a test set.
+        TODO: This does not work with sparse matrices yet
         
         Parameters
         ----------

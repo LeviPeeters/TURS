@@ -137,14 +137,16 @@ class Rule:
         if self.rule_base is None:
             # candidate_cuts_selector = (candidate_cuts[icol] < np.max(self.features_excl[:, icol])) & \
             #                           (candidate_cuts[icol] > np.min(self.features_excl[:, icol]))
-            candidate_cuts_selector = (candidate_cuts[icol] < np.max(self.data_info.features[self.indices_excl][:, icol])) & \
-                                      (candidate_cuts[icol] > np.min(self.data_info.features[self.indices_excl][:, icol]))
+            candidate_cuts_selector = (candidate_cuts[icol] < np.max(self.data_info.features[self.indices_excl, [icol]].flatten())) & \
+                                      (candidate_cuts[icol] > np.min(self.data_info.features[self.indices_excl, [icol]].flatten()))
             candidate_cuts_icol = candidate_cuts[icol][candidate_cuts_selector]
+            # print(candidate_cuts[icol])# < np.max(self.data_info.features[self.indices_excl, [icol]]))
+            # breakpoint()
         else:
             # candidate_cuts_selector = (candidate_cuts[icol] < np.max(self.features[:, icol])) & \
             #                           (candidate_cuts[icol] > np.min(self.features[:, icol]))
-            candidate_cuts_selector = (candidate_cuts[icol] < np.max(self.data_info.features[self.indices][:, icol])) & \
-                                      (candidate_cuts[icol] > np.min(self.data_info.features[self.indices][:, icol]))
+            candidate_cuts_selector = (candidate_cuts[icol] < np.max(self.data_info.features[self.indices, [icol]])) & \
+                                      (candidate_cuts[icol] > np.min(self.data_info.features[self.indices, [icol]]))
             candidate_cuts_icol = candidate_cuts[icol][candidate_cuts_selector]
         return candidate_cuts_icol
 
@@ -227,7 +229,14 @@ class Rule:
         # Consider each feature
         for icol in range(self.data_info.ncol):
             candidate_cuts_icol = self.get_candidate_cuts_icol_given_rule(candidate_cuts, icol)
-            bi_array = self.data_info.features[:, icol]
+            
+            # Non-sparse
+            # bi_array = self.data_info.features[:, icol]
+
+            # Sparse: The binary array needs to be converted to dense and flattened, as sparse matrices do not reduce in dimension after slicing
+            bi_array = self.data_info.features[:, [icol]].todense().flatten()
+ 
+
 
             # Consider every candidate cut point
             for i, cut in enumerate(candidate_cuts_icol):
