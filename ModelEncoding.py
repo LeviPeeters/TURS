@@ -124,7 +124,9 @@ class ModelEncodingDependingOnData:
         l_cuts = 0
         for index, col in enumerate(col_orders):
             # Calculate the bounds of this feature for the remaining data
-            up_bound, low_bound = np.max(self.data_info.features[bool_, [col]].flatten()), np.min(self.data_info.features[bool_, [col]].flatten())
+            # print(type(self.data_info.features[bool_, [col]]))
+            # print(self.data_info.features[bool_, [col]])
+            up_bound, low_bound = np.max(self.data_info.features[bool_, [col]]), np.min(self.data_info.features[bool_, [col]])
             num_cuts = np.count_nonzero((self.data_info.candidate_cuts[col] >= low_bound) &
                                         (self.data_info.candidate_cuts[col] <= up_bound))  # only an approximation here.
             

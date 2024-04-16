@@ -40,6 +40,7 @@ class DataInfo:
         # else:
         #     self.target = y
 
+        # TODO: Currently, TURS only works with sparse matrices. Eventually, it should be possible to choose between sparse and dense matrices
         self.features = csc_array(X) # Sparse matrix
         self.target = y
 

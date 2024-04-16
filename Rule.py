@@ -34,16 +34,14 @@ class Rule:
                  mdl_gain_excl, 
                  icols_in_order):  
 
-        self.ruleset = ruleset
+        self.ruleset = ruleset 
         self.data_info = data_info # Metadata
         self.rule_base = rule_base  # The previous level of this rule
         self.icols_in_order = icols_in_order  # The order of the columns in the data
 
-
         # Numpy arrays with indices of covered indices
         self.indices = indices  
         self.indices_excl = indices_excl  
-
 
         # Boolean arrays indicating covered indices
         self.bool_array = self.get_bool_array(self.indices)
@@ -229,30 +227,26 @@ class Rule:
         # Consider each feature
         for icol in range(self.data_info.ncol):
             candidate_cuts_icol = self.get_candidate_cuts_icol_given_rule(candidate_cuts, icol)
-            
-            # Non-sparse
-            # bi_array = self.data_info.features[:, icol]
 
             # Sparse: The binary array needs to be converted to dense and flattened, as sparse matrices do not reduce in dimension after slicing
             bi_array = self.data_info.features[:, [icol]].todense().flatten()
  
-
-
             # Consider every candidate cut point
             for i, cut in enumerate(candidate_cuts_icol):
-                # if self.printing:
-                #     print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - rule.grow. feature: {icol} / {self.data_info.ncol}, cut: {i} / {len(candidate_cuts_icol)}")
-                
                 # Construct binary arrays indicating which features fall on each side of the cut
-                # excl_left_bi_array = (self.features_excl[:, icol] < cut)
-                self.excl_left_bi_array = (bi_array[self.indices_excl] < cut)
-                self.excl_right_bi_array = ~self.excl_left_bi_array
-                # left_bi_array = (self.features[:, icol] < cut)
-                self.left_bi_array = (bi_array[self.indices] < cut)
-                self.right_bi_array = ~self.left_bi_array
+                excl_left_bi_array = (bi_array[self.indices_excl] < cut)
+                excl_right_bi_array = ~excl_left_bi_array
+                left_bi_array = (bi_array[self.indices] < cut)
+                right_bi_array = ~left_bi_array
+
+                # Store all of the binary arrays in a dictionary to make them easy to pass to validity check
+                bi_arrays = {"left": left_bi_array, 
+                             "right": right_bi_array, 
+                             "excl_left": excl_left_bi_array,
+                             "excl_right": excl_right_bi_array}
 
                 # Check validity and skip if not valid
-                _validity = self.validity_check(icol=icol, cut=cut)
+                _validity = self.validity_check(icol=icol, cut=cut, bi_arrays=bi_arrays)
 
                 if self.data_info.not_use_excl_:
                     _validity["res_excl"] = False
@@ -260,30 +254,27 @@ class Rule:
                 if _validity["res_excl"] == False and _validity["res_incl"] == False:
                     continue
 
-                incl_left_coverage, incl_right_coverage = np.count_nonzero(self.left_bi_array), np.count_nonzero(
-                    self.right_bi_array)
-                excl_left_coverage, excl_right_coverage = np.count_nonzero(self.excl_left_bi_array), np.count_nonzero(
-                    self.excl_right_bi_array)
+                incl_left_coverage, incl_right_coverage = np.count_nonzero(left_bi_array), np.count_nonzero(
+                    right_bi_array)
+                excl_left_coverage, excl_right_coverage = np.count_nonzero(excl_left_bi_array), np.count_nonzero(
+                    excl_right_bi_array)
 
                 # Question: Why is there no check on incl_coverage being 0?
                 if excl_left_coverage == 0 or excl_right_coverage == 0:
                     continue
 
                 # Update the beam with the results. We do this twice, because a cut can be < or >
-                self.update_grow_beam(bi_array=self.left_bi_array, excl_bi_array=self.excl_left_bi_array, icol=icol,
+                self.update_grow_beam(bi_array=left_bi_array, excl_bi_array=excl_left_bi_array, icol=icol,
                                       cut=cut, cut_option=constant.LEFT_CUT,
                                       incl_coverage=incl_left_coverage, excl_coverage=excl_left_coverage,
                                       grow_info_beam=grow_info_beam, incl_or_excl=incl_or_excl,
                                       _validity=_validity)
 
-                self.update_grow_beam(bi_array=self.right_bi_array, excl_bi_array=self.excl_right_bi_array, icol=icol,
+                self.update_grow_beam(bi_array=right_bi_array, excl_bi_array=excl_right_bi_array, icol=icol,
                                       cut=cut, cut_option=constant.RIGHT_CUT,
                                       incl_coverage=incl_right_coverage, excl_coverage=excl_right_coverage,
                                       grow_info_beam=grow_info_beam, incl_or_excl=incl_or_excl,
                                       _validity=_validity)
-
-                del self.excl_left_bi_array, self.excl_right_bi_array, self.left_bi_array, self.right_bi_array
-
 
     def calculate_mdl_gain(self, bi_array, excl_bi_array, icol, cut_option):
         """ Calculate the MDL gain when adding a cut to the rule by calling various functions in the model and data encoding.
@@ -318,7 +309,7 @@ class Rule:
         return {"cl_model": cl_model, "cl_data": cl_data, "cl_data_excl": cl_data_excl,
                 "absolute_gain": absolute_gain, "absolute_gain_excl": absolute_gain_excl}
 
-    def validity_check(self, icol, cut):
+    def validity_check(self, icol, cut, bi_arrays):
         """ Control function for validity check
 
         
@@ -330,6 +321,8 @@ class Rule:
             Index of the column for which the candidate cut is calculated
         cut : float
             Candidate cut
+        bi_arrays : dict
+            Binary arrays containing the instances covered by the rule left and right of the cut
         
         Returns
         ---
@@ -341,18 +334,18 @@ class Rule:
         if self.data_info.alg_config.validity_check == "no_check":
             pass
         elif self.data_info.alg_config.validity_check == "excl_check":
-            res_excl = self.check_split_validity_excl(icol, cut)
+            res_excl = self.check_split_validity_excl(icol, bi_arrays)
         elif self.data_info.alg_config.validity_check == "incl_check":
-            res_incl = self.check_split_validity(icol, cut)
+            res_incl = self.check_split_validity(icol, bi_arrays)
         elif self.data_info.alg_config.validity_check == "either":
-            res_excl = self.check_split_validity_excl(icol, cut)
-            res_incl = self.check_split_validity(icol, cut)
+            res_excl = self.check_split_validity_excl(icol, bi_arrays)
+            res_incl = self.check_split_validity(icol, bi_arrays)
         else:
             # TODO: I should improve this error message a bit
             sys.exit("Error: the if-else statement should not end up here")
         return {"res_excl": res_excl, "res_incl": res_incl}
 
-    def check_split_validity(self, icol, cut):
+    def check_split_validity(self, icol, bi_arrays):
         """ Check validity when considering overlapping instances
         
         Parameters
@@ -361,23 +354,20 @@ class Rule:
             Rule to be checked
         icol : int
             Index of the column for which the candidate cut is calculated
-        cut : float
-            Candidate cut
+        bi_arrays : dict
+            Binary arrays containing the instances covered by the rule left and right of the cut
         
         Returns
         ---
         : bool
             Whether the split is valid
         """
-        # indices_left, indices_right = rule.indices[rule.features[:, icol] < cut], rule.indices[rule.features[:, icol] >= cut]
-        # indices_left, indices_right = self.indices[self.data_info.features[self.indices][:, icol] < cut], self.indices[self.data_info.features[self.indices][:, icol] >= cut]
-        indices_left, indices_right = np.where(self.left_bi_array)[0], np.where(self.right_bi_array)[0]
+        indices_left, indices_right = np.where(bi_arrays["left"])[0], np.where(bi_arrays["right"])[0]
 
         # Compute probabilities for the coverage of the rule and both sides of the split
         p_left = utils_calculating_cl.calc_probs(self.data_info.target[indices_left], self.data_info.num_class)
         p_right = utils_calculating_cl.calc_probs(self.data_info.target[indices_right], self.data_info.num_class)
 
-        # Compute the negative log-likelihoods for these probabilities
         # Compute the negative log-likelihoods for these probabilities
         nll_rule = utils_calculating_cl.calc_negloglike(self.prob, self.coverage)
         nll_left = utils_calculating_cl.calc_negloglike(p_left, len(indices_left))
@@ -400,7 +390,7 @@ class Rule:
 
         
 
-    def check_split_validity_excl(self, icol, cut):
+    def check_split_validity_excl(self, icol, bi_arrays):
         """ Check validity without considering overlapping instances
         
         Parameters
@@ -409,17 +399,15 @@ class Rule:
             Rule to be checked
         icol : int
             Index of the column for which the candidate cut is calculated
-        cut : float
-            Candidate cut
+        bi_arrays : dict
+            Binary arrays containing the instances covered by the rule left and right of the cut
         
         Returns
         ---
         : bool
             Whether the split is valid
         """
-        # indices_left, indices_right = rule.indices_excl[rule.features_excl[:, icol] < cut], rule.indices_excl[rule.features_excl[:, icol] >= cut]
-        # indices_left, indices_right = self.indices_excl[self.data_info.features[self.indices_excl][:, icol] < cut], self.indices_excl[self.data_info.features[self.indices_excl][:, icol] >= cut]
-        indices_left, indices_right = np.where(self.excl_left_bi_array)[0], np.where(self.excl_right_bi_array)[0]
+        indices_left, indices_right = np.where(bi_arrays["excl_left"])[0], np.where(bi_arrays["excl_right"])[0]
 
         # Compute probabilities for the coverage of the rule and both sides of the split
         p_left = utils_calculating_cl.calc_probs(self.data_info.target[indices_left], self.data_info.num_class)

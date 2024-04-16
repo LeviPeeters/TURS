@@ -11,29 +11,17 @@ from guppy import hpy
 
 from sklearn.model_selection import StratifiedKFold
 
-<<<<<<< HEAD
-import DataInfo 
-import Ruleset
-import ModelEncoding
-import DataEncoding
-
 import utils_dataprep
-import utils_namedtuple
 import utils
-=======
 import TURS
 import utils_dataprep
->>>>>>> multithreading
 
 np.seterr(all='raise')
 print("Running TURS with multithreading")
 
 h = hpy()
-<<<<<<< HEAD
 make_call_graph = False
 log_learning_process = True
-=======
->>>>>>> multithreading
 
 exp_res_alldata = []
 date_and_time = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -76,7 +64,7 @@ for fold in range(5):
 
     start_time = time.time()
     
-    turs = TURS(
+    turs = TURS.TURS(
         num_candidate_cuts=20,
         max_num_rules=500,
         max_grow_iter=500,
@@ -92,48 +80,12 @@ for fold in range(5):
         validity_check="either"
     )
 
-    if make_call_graph:
-        custom_include = [
-            "Beam.*",
-            "exp_utils.*",
-            "ModellingGroup.*",
-            "nml_regret.*",
-            "Rule.*",
-            "RuleGrowConstraint.*",
-            "utils_modelencoding.*",
-            "utils_namedtuple.*",
-            "utils_predict.*",
-            "Ruleset.*", 
-            "ModelEncoding.*", 
-            "DataEncoding.*", 
-            "DataInfo.*", 
-            "utils_calculating_cl.*",  
-            "exp_predictive_perf.*",
-            "run_uci.*",
-        ]
-        utils.call_graph_filtered(ruleset.fit, "call_graph.png", custom_include=custom_include)
-    else:
-        ruleset.fit(max_iter=1000)
-    
-    if first_run:
-        print(ruleset)
+    turs.fit(X_train, y_train)
 
     end_time = time.time()
     times.append(end_time - start_time)
 
-    ## ROC_AUC and log-loss
-    # exp_res = exp_predictive_perf.calculate_exp_res(ruleset, X_test, y_test, X_train, y_train, data_name, fold, start_time, end_time)
-    # exp_res_alldata.append(exp_res)
-
     first_run = False
 
-# exp_res_df = pd.DataFrame(exp_res_alldata)
 print(f"Mean time: {np.mean(times)}")
 
-# folder_name = "exp_uci_" + date_and_time[:8]
-# os.makedirs(folder_name, exist_ok=True)
-# if fold_given is None:
-#     res_file_name = "./" + folder_name + "/" + date_and_time + "_" + data_name + "_uci_datasets_res.csv"
-# else:
-#     res_file_name = "./" + folder_name + "/" + date_and_time + "_" + data_name + "_fold" + str(fold_given) + "_uci_datasets_res.csv"
-# exp_res_df.to_csv(res_file_name, index=False)

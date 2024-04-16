@@ -371,6 +371,11 @@ class Ruleset:
                 Thread(target=self.search_rule_incl_or_excl, args=(rules_for_next_iter, "incl", final_beams)),
                 Thread(target=self.search_rule_incl_or_excl, args=(rules_for_next_iter, "excl", final_beams))
             ]
+
+            # threads[0].start()
+            # threads[0].join()
+            # threads[1].start()
+            # threads[1].join()
             
             # Start the threads
             for t in threads:
@@ -412,6 +417,7 @@ class Ruleset:
     def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
         beam_list = []
         for rule in rules_for_next_iter:
+            rule: Rule.Rule
             beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
             rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
             beam_list.append(beam)
