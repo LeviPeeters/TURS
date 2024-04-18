@@ -27,7 +27,7 @@ class TURS():
                  ) -> None:
         
         if log_folder_name is None:
-            log_folder_name = f"{datetime.now().strftime('%Y%m%d_%H%M')}_{dataset_name}"
+            log_folder_name = f"{datetime.now().strftime('%Y%m%d_%H%M')}"
         
         self.alg_config = utils_namedtuple.AlgConfig(
             num_candidate_cuts=num_candidate_cuts, 
