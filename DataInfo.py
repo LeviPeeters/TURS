@@ -16,7 +16,10 @@ class DataInfo:
         if alg_config is None:
             assert beam_width is not None
             self.alg_config = utils_namedtuple.AlgConfig(
-                num_candidate_cuts=100, max_num_rules=500, max_grow_iter=200, num_class_as_given=None,
+                num_candidate_cuts=100, 
+                max_num_rules=500, 
+                max_grow_iter=200, 
+                num_class_as_given=None,
                 beam_width=beam_width,
                 log_learning_process=False,
                 dataset_name=None,
@@ -28,18 +31,6 @@ class DataInfo:
             self.alg_config = alg_config
 
         self.not_use_excl_ = not_use_excl_
-
-        # # Make sure X and y are numpy arrays
-        # if type(X) != np.ndarray:
-        #     self.features = X.to_numpy()
-        # else:
-        #     self.features = X
-        # self.features = csr_array(self.features)
-
-        # if type(y) != np.ndarray:
-        #     self.target = y.to_numpy().flatten()
-        # else:
-        #     self.target = y
 
         # TODO: Currently, TURS only works with sparse matrices. Eventually, it should be possible to choose between sparse and dense matrices
         self.features = csc_array(X) # Sparse matrix

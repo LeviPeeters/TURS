@@ -12,7 +12,6 @@ from guppy import hpy
 from sklearn.model_selection import StratifiedKFold
 
 import utils_dataprep
-import utils
 import TURS
 import utils_dataprep
 
@@ -37,14 +36,11 @@ else:
     fold_given = 0
 
 d = utils_dataprep.read_data(data_name)
-d, class_labels = utils_dataprep.preprocess_data(d)
-
-X = d.iloc[:, :d.shape[1] - 1].to_numpy()
-y = d.iloc[:, d.shape[1] - 1].to_numpy()
+X, y, class_labels = utils_dataprep.preprocess_sparse(d)
 
 kf = StratifiedKFold(n_splits=5, shuffle=True,
                      random_state=2)  # can also use sklearn.model_selection.StratifiedKFold
-kfold = kf.split(X=X, y=y)
+kfold = kf.split(X=np.zeros(shape=y.shape), y=y)# X is not actually required, and sparse matrices are not supported
 kfold_list = list(kfold)
 
 times = []
@@ -54,13 +50,11 @@ for fold in range(5):
     if fold_given is not None and fold != fold_given:
         continue
     print("running: ", data_name, "; fold: ", fold)
-    dtrain = copy.deepcopy(d.iloc[kfold_list[fold][0], :])
-    dtest = copy.deepcopy(d.iloc[kfold_list[fold][1], :])
 
-    X_train = dtrain.iloc[:, :dtrain.shape[1]-1].to_numpy()
-    y_train = dtrain.iloc[:, dtrain.shape[1]-1].to_numpy()
-    X_test = dtest.iloc[:, :-1].to_numpy()
-    y_test = dtest.iloc[:, -1].to_numpy()
+    X_train = X[kfold_list[fold][0], :]
+    y_train = y[kfold_list[fold][0]]
+    X_test = X[kfold_list[fold][1], :]
+    y_test = y[kfold_list[fold][1]]
 
     start_time = time.time()
     

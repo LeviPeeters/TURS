@@ -26,20 +26,23 @@ class TURS():
                     validity_check: str = "either"
                  ) -> None:
         
+        if log_folder_name is None:
+            log_folder_name = f"{datetime.now().strftime('%Y%m%d_%H%M')}"
+        
         self.alg_config = utils_namedtuple.AlgConfig(
-            num_candidate_cuts=20, 
-            max_num_rules=500, 
-            max_grow_iter=500, 
-            num_class_as_given=None,
-            beam_width=10,
+            num_candidate_cuts=num_candidate_cuts, 
+            max_num_rules=max_num_rules, 
+            max_grow_iter=max_grow_iter, 
+            num_class_as_given=num_class_as_given,
+            beam_width=beam_width,
             log_learning_process=log_learning_process,
-            log_folder_name=f"{datetime.now().strftime('%Y%m%d_%H%M%s')}_{dataset_name}",
-            dataset_name=None,
+            log_folder_name=log_folder_name,
+            dataset_name=dataset_name,
             feature_names=feature_names,
             label_names=label_names,
-            which_features=None,
-            random_seed=None,
-            validity_check="either"
+            which_features=which_features,
+            random_seed=random_seed,
+            validity_check=validity_check
         )
 
         self.call_graph_custom_include = [
