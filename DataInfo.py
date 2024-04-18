@@ -16,7 +16,10 @@ class DataInfo:
         if alg_config is None:
             assert beam_width is not None
             self.alg_config = utils_namedtuple.AlgConfig(
-                num_candidate_cuts=100, max_num_rules=500, max_grow_iter=200, num_class_as_given=None,
+                num_candidate_cuts=100, 
+                max_num_rules=500, 
+                max_grow_iter=200, 
+                num_class_as_given=None,
                 beam_width=beam_width,
                 log_learning_process=False,
                 dataset_name=None,

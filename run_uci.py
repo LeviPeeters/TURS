@@ -12,7 +12,6 @@ from guppy import hpy
 from sklearn.model_selection import StratifiedKFold
 
 import utils_dataprep
-import utils
 import TURS
 import utils_dataprep
 
@@ -51,8 +50,6 @@ for fold in range(5):
     if fold_given is not None and fold != fold_given:
         continue
     print("running: ", data_name, "; fold: ", fold)
-    # dtrain = copy.deepcopy(d.iloc[kfold_list[fold][0], :])
-    # dtest = copy.deepcopy(d.iloc[kfold_list[fold][1], :])
 
     X_train = X[kfold_list[fold][0], :]
     y_train = y[kfold_list[fold][0]]
