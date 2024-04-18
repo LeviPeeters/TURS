@@ -114,13 +114,18 @@ def preprocess_sparse(df):
     df = df.reset_index().drop("index", axis=1)
 
     le = LabelEncoder()
-    df.iloc[:, -1] = le.fit_transform(df.iloc[:, -1])
+    y = le.fit_transform(df.iloc[:, -1])
     unique_labels = le.classes_
 
-    ohe = OneHotEncoder(sparse_output=True, dtype=np.int, drop="if_binary")#, feature_name_combiner="concat")
+    ohe = OneHotEncoder(sparse_output=False, dtype=np.int, drop="if_binary")#, feature_name_combiner="concat")
     
     for icol in range(df.shape[1] - 1):
-        d_transformed = ohe.fit_transform(df.iloc[:, icol:(icol+1)])
+        if df.iloc[:, icol].dtype == "float" or df.iloc[:, icol].dtype == "int":
+            # Numerical features are left intact
+            d_transformed = csc_matrix(df.iloc[:, icol:(icol+1)])
+        else:
+            d_transformed = ohe.fit_transform(df.iloc[:, icol:(icol+1)])
+            d_transformed = csc_matrix(d_transformed)
 
         # Add the transformed feature to the preprocessed dataframe
         if icol == 0:
@@ -128,7 +133,7 @@ def preprocess_sparse(df):
         else:
             X = hstack((X, d_transformed)) # Note, this is the scipy hstack, not the numpy hstack
 
-    return X[:,:-1], X[:,-1], unique_labels
+    return X, y, unique_labels
 
 def calculate_roc_auc_logloss(ruleset, y_test, y_pred_prob, y_train, y_pred_prob_train):
     """ Calculate various evaluation metrics using sklearn 
