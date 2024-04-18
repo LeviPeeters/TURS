@@ -9,6 +9,7 @@ from scipy.sparse import csc_array
 
 import utils_namedtuple
 import utils_calculating_cl
+import utils
 
 class DataInfo:
     def __init__(self, X, y, beam_width=None, alg_config=None, not_use_excl_=None):
@@ -82,23 +83,41 @@ class DataInfo:
         # TODO: what does this do
         self.cached_number_of_rules_for_cl_model = self.alg_config.max_grow_iter
         
-        # Set up a logging file 
+        # Set up logging files
         if self.alg_config.log_learning_process:
             time = datetime.now().strftime("%Y-%m-%d_%H-%M")
             if self.alg_config.log_folder_name:
                 os.mkdir(f"logs/{self.alg_config.log_folder_name}")
-                logging.basicConfig(filename=f"logs/{self.alg_config.log_folder_name}/log.txt", encoding='utf-8', level=logging.INFO, format='%(asctime)s %(message)s')
+                filename=f"logs/{self.alg_config.log_folder_name}/log"
             else:
                 os.mkdir(f"logs/{time}")
-                logging.basicConfig(filename=f"logs/{time}/log.txt", encoding='utf-8', level=logging.DEBUG, format='%(asctime)s %(message)s')
+                filename=f"logs/{time}/log"
+
+            # Set up a text logger
+            handler = logging.FileHandler(filename=filename+".txt", encoding='utf-8', mode='w')
+            handler.setFormatter(utils.ElapsedTimeFormatter())
+            self.logger: logging.RootLogger
+            self.logger = logging.getLogger("text_logger")
+            self.logger.addHandler(handler)
+            self.logger.setLevel(logging.INFO)
 
             # Write the configuration to the log file
-            logging.info(f"Log for learning process at {time}\n")
-            logging.info(f"Algorithm Configuration:")
+            self.logger.info(f"Log for learning process at {time}\n")
+            self.logger.info(f"Algorithm Configuration:")
             for key, value in self.alg_config._asdict().items():
                 if key != "feature_names":
-                    logging.info(f"{key}: {value}")
-            logging.info("\n")
+                    self.logger.info(f"{key}: {value}")
+            self.logger.info("\n")
+
+
+            handler2 = logging.FileHandler(filename=filename+"_time.csv", encoding='utf-8', mode='w')
+            handler2.setFormatter(logging.Formatter('%(message)s'))
+            self.time_logger: logging.RootLogger
+            self.time_logger = logging.getLogger("time_logger")
+            self.time_logger.addHandler(handler2)
+            self.time_logger.setLevel(logging.INFO)
+            self.time_logger.info("Thread,Time,Function")
+
 
     
     def candidate_cuts_quantile_midpoints(self, num_candidate_cuts):

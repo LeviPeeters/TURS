@@ -1,7 +1,6 @@
 import numpy as np
 import os
 from datetime import datetime
-import logging
 from threading import Thread
 from memory_profiler import profile
 from guppy import hpy
@@ -13,6 +12,7 @@ import DataInfo
 import utils_calculating_cl
 import ModelEncoding
 import DataEncoding
+import utils
 
 def make_rule_from_grow_info(grow_info):
     """ Make a rule from the information of a grow step
@@ -202,7 +202,6 @@ class Ruleset:
 
     def fit(self, max_iter=1000):
         """ Fit the data by iteratively adding rules to the ruleset
-        # TODO: Think about logging
         
         Parameters
         ---
@@ -216,16 +215,16 @@ class Ruleset:
         total_cl : float
             Total code length of the ruleset
         """
-        logging.info(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - ruleset.fit")
+        self.data_info.logger.info(f"ruleset.fit")
 
         # Keep track of CL progression
         total_cl = [self.total_cl]
 
         for iter in range(max_iter):
             if self.data_info.log_learning_process:
-                logging.info("--------------------")
-                logging.info(f"Iteration {iter}")
-                logging.info("--------------------")
+                self.data_info.logger.info("--------------------")
+                self.data_info.logger.info(f"Iteration {iter}")
+                self.data_info.logger.info("--------------------")
             
             # Grow a rule
             rule_to_add = self.search_next_rule(k_consecutively=5)
@@ -235,16 +234,19 @@ class Ruleset:
                 self.add_rule(rule_to_add)
                 total_cl.append(self.total_cl)
                 if self.data_info.log_learning_process:
-                    logging.info(f"Added the following rule to the ruleset:")
-                    logging.info(str(rule_to_add))
+                    self.data_info.logger.info(f"Added the following rule to the ruleset:")
+                    self.data_info.logger.info(str(rule_to_add))
             else:
                 break
 
         if self.data_info.log_learning_process:
-            logging.info(f"Finished learning process at {datetime.now().strftime('%Y-%m-%d_%H-%M')}")
-            logging.info(f"Final ruleset is: ")
-            logging.info(str(self))
-            logging.info("\n")
+            self.data_info.logger.info(f"Finished learning process at {datetime.now().strftime('%Y-%m-%d_%H-%M')}")
+            self.data_info.logger.info(f"Final ruleset is: ")
+            self.data_info.logger.info(str(self))
+            self.data_info.logger.info("\n")
+            time_report = utils.time_report(f"./logs/{self.data_info.alg_config.log_folder_name}/log_time.csv").to_string()
+            self.data_info.logger.info(f"Time report: \n{time_report}")
+
     
         return total_cl
 
@@ -296,7 +298,6 @@ class Ruleset:
         final_info_excl : list
             list of info dicts for the best rules, excluding previously covered instances
         """
-        logging.info(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - ruleset.combine_beams")
 
         infos = []
         coverages = []
@@ -337,7 +338,7 @@ class Ruleset:
           : Rule object
             Rule found by the beam search
         """
-        logging.info(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - ruleset.search_next_rule")
+        self.data_info.logger.info(f"ruleset.search_next_rule")
 
         if rule_given is None:
             rule = Rule.Rule(indices=np.arange(self.data_info.nrow), 
@@ -360,22 +361,19 @@ class Ruleset:
 
         for i in range(self.data_info.max_grow_iter):
             if self.data_info.log_learning_process:
-                logging.info(f"    Grow iteration {i}")
-                logging.info(f"    Number of rules for this iteration: {len(rules_for_next_iter)}")
-                logging.info(f"    Total number of candidates: {len(rules_candidates)}")
+                self.data_info.logger.info("")
+                self.data_info.logger.info(f"    Grow iteration {i}")
+                self.data_info.logger.info(f"    Number of rules for this iteration: {len(rules_for_next_iter)}")
+                self.data_info.logger.info(f"    Total number of candidates: {len(rules_candidates)}")
+                self.data_info.logger.info("")
 
             final_beams = {}
 
             # Create threads to search for the best rule in the incl and excl beams
             threads = [
-                Thread(target=self.search_rule_incl_or_excl, args=(rules_for_next_iter, "incl", final_beams)),
+                Thread(target=self.search_rule_incl_or_excl, args=(rules_for_next_iter, "incl", final_beams, True)),
                 Thread(target=self.search_rule_incl_or_excl, args=(rules_for_next_iter, "excl", final_beams))
             ]
-
-            # threads[0].start()
-            # threads[0].join()
-            # threads[1].start()
-            # threads[1].join()
             
             # Start the threads
             for t in threads:
@@ -414,12 +412,12 @@ class Ruleset:
         which_best_ = np.argmax([r.incl_gain_per_excl_coverage for r in rules_candidates])
         return rules_candidates[which_best_]
     
-    def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+    def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams, log=False):
         beam_list = []
         for rule in rules_for_next_iter:
             rule: Rule.Rule
-            beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
-            rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+            beam = Beam.DiverseCovBeam(width=self.data_info.beam_width, time_logger=self.data_info.time_logger)
+            rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl, log=log)
             beam_list.append(beam)
  
         # Combine the beams and make GrowInfoBeam objects to store them

@@ -5,6 +5,7 @@ import utils_calculating_cl
 import nml_regret
 import Beam
 import DataInfo
+import time
 
 import constant
 
@@ -149,7 +150,7 @@ class Rule:
         return candidate_cuts_icol
 
     def update_grow_beam(self, bi_array, excl_bi_array, icol, cut, cut_option, incl_coverage, excl_coverage,
-                         grow_info_beam: Beam.GrowInfoBeam, incl_or_excl, _validity):
+                         grow_info_beam: Beam.GrowInfoBeam, incl_or_excl, _validity, log=False):
         """ Use information of a grow step to update the beam.
 
         Parameters
@@ -174,16 +175,20 @@ class Rule:
             Beam of rules without previously covered instances
         _validity : dict
             Results of validity checks for the rule
+        log : bool
+            Whether to log to a csv file
 
         Returns
         ---
         None
         """
 
+        s = time.time()
         # Calculate the MDL gain
         info_theo_scores = self.calculate_mdl_gain(bi_array=bi_array, excl_bi_array=excl_bi_array,
                                                    icol=icol, cut_option=cut_option)
-        
+        if log:
+            self.data_info.time_logger.info(f"0,{time.time() - s},calculate_mdl_gain")
 
         # Store info in a dictionary
         grow_info = store_grow_info(
@@ -204,10 +209,12 @@ class Rule:
             cov_percent = grow_info[f"coverage_excl"] / self.coverage_excl
 
         # Update the beams if the grow step is valid
+        # Be careful when multithreading here! Two threads should not update the beam at the same time
         if _validity[f"res_{incl_or_excl}"]:
-            grow_info_beam.update(grow_info, grow_info[f"normalized_gain_{incl_or_excl}"], cov_percent)
+            grow_info_beam.update(grow_info, grow_info[f"normalized_gain_{incl_or_excl}"], cov_percent, log=log)
+        
 
-    def grow(self, grow_info_beam, incl_or_excl):
+    def grow(self, grow_info_beam, incl_or_excl, log=False):
         """ Grow the rule by one step and update the 
         
         Parameters
@@ -221,16 +228,23 @@ class Rule:
         ---
         None
         """
-
+        if log:
+            self.data_info.logger.info(f"Growing rule with coverage {self.coverage} and coverage_excl {self.coverage_excl}")
+        
         candidate_cuts = self.data_info.candidate_cuts
+
+        total_time_in_update_grow_beam = 0
+        total_time_getting_data = 0
 
         # Consider each feature
         for icol in range(self.data_info.ncol):
             candidate_cuts_icol = self.get_candidate_cuts_icol_given_rule(candidate_cuts, icol)
 
+            s = time.time()
             # Sparse: The binary array needs to be converted to dense and flattened, as sparse matrices do not reduce in dimension after slicing
             bi_array = self.data_info.features[:, [icol]].todense().flatten()
- 
+            total_time_getting_data += time.time() - s
+
             # Consider every candidate cut point
             for i, cut in enumerate(candidate_cuts_icol):
                 # Construct binary arrays indicating which features fall on each side of the cut
@@ -262,19 +276,25 @@ class Rule:
                 # Question: Why is there no check on incl_coverage being 0?
                 if excl_left_coverage == 0 or excl_right_coverage == 0:
                     continue
-
+                
+                start = time.time()
                 # Update the beam with the results. We do this twice, because a cut can be < or >
                 self.update_grow_beam(bi_array=left_bi_array, excl_bi_array=excl_left_bi_array, icol=icol,
                                       cut=cut, cut_option=constant.LEFT_CUT,
                                       incl_coverage=incl_left_coverage, excl_coverage=excl_left_coverage,
                                       grow_info_beam=grow_info_beam, incl_or_excl=incl_or_excl,
-                                      _validity=_validity)
+                                      _validity=_validity, log=log)
 
                 self.update_grow_beam(bi_array=right_bi_array, excl_bi_array=excl_right_bi_array, icol=icol,
                                       cut=cut, cut_option=constant.RIGHT_CUT,
                                       incl_coverage=incl_right_coverage, excl_coverage=excl_right_coverage,
                                       grow_info_beam=grow_info_beam, incl_or_excl=incl_or_excl,
-                                      _validity=_validity)
+                                      _validity=_validity, log=log)
+                total_time_in_update_grow_beam += time.time() - start
+        
+        if log:
+            self.data_info.time_logger.info(f"0,{total_time_in_update_grow_beam},update_grow_beam")
+            self.data_info.time_logger.info(f"0,{total_time_getting_data},getting_data")
 
     def calculate_mdl_gain(self, bi_array, excl_bi_array, icol, cut_option):
         """ Calculate the MDL gain when adding a cut to the rule by calling various functions in the model and data encoding.

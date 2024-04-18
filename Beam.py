@@ -1,4 +1,5 @@
 import numpy as np
+import time
 
 class GrowInfoBeam:
     """
@@ -70,7 +71,7 @@ class DiverseCovBeam:
     This class is used to store the information of a grow step in the beam search, with the coverage percentage as the key.
     We use it to control the diversity of the coverage of the growth results in the beam.
     """
-    def __init__(self, width):
+    def __init__(self, width, time_logger):
         self.coverage_percentage = np.linspace(0, 1, width + 1)[1:]
         self.infos = {}
         for i, cov in enumerate(self.coverage_percentage):
@@ -82,8 +83,9 @@ class DiverseCovBeam:
 
         self.worst_gain = None
         self.width = width
+        self.time_logger = time_logger
 
-    def update(self, info, gain, coverage_percentage):
+    def update(self, info, gain, coverage_percentage, log=False):
         """ Update the beam with a new growth step. 
         
         
@@ -96,8 +98,11 @@ class DiverseCovBeam:
         coverage_percentage : float
             Coverage percentage of the growth step
         """
+        s = time.time()
         # Find which coverage interval the new step belongs to
         which_coverage_interval = np.searchsorted(a=self.coverage_percentage, v=coverage_percentage)
+        if log:
+            self.time_logger.info(f"0,{time.time() - s},searchsorted")
         
         # If this interval is empty, add the new step
         if self.infos[which_coverage_interval] is None:
@@ -110,10 +115,15 @@ class DiverseCovBeam:
             skip_flag = False
             info_coverage = np.count_nonzero(info["incl_bi_array"])
             if info_coverage == np.count_nonzero(self.infos[which_coverage_interval]["incl_bi_array"]):
+                s = time.time()
                 if np.array_equal(info["incl_bi_array"], self.infos[which_coverage_interval]["incl_bi_array"]):
                     skip_flag = True
-
+                if log:
+                    self.time_logger.info(f"0,{time.time() - s},array_equal")
+            s = time.time()
             if not skip_flag and gain > self.gains[which_coverage_interval]:
                 self.infos[which_coverage_interval] = info
                 self.gains[which_coverage_interval] = gain
                 self.worst_gain = np.min(self.gains)
+            if log:
+                self.time_logger.info(f"0,{time.time() - s},update")
