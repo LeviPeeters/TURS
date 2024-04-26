@@ -98,9 +98,10 @@ class DataInfo:
             for key, value in self.alg_config._asdict().items():
                 if key != "feature_names":
                     self.logger.info(f"{key}: {value}")
+            self.logger.info("Number of features: " + str(self.ncol))
             self.logger.info("\n")
 
-
+            # For logging the time taken for each function to a CSV file
             handler2 = logging.FileHandler(filename=filename+"_time.csv", encoding='utf-8', mode='w')
             handler2.setFormatter(logging.Formatter('%(message)s'))
             self.time_logger: logging.RootLogger
@@ -109,7 +110,17 @@ class DataInfo:
             self.time_logger.setLevel(logging.INFO)
             self.time_logger.info("Thread,Time,Function")
 
+            # For logging information about the growth process to a CSV file
+            handler3 = logging.FileHandler(filename=filename+"_growth.csv", encoding='utf-8', mode='w')
+            handler3.setFormatter(logging.Formatter('%(message)s'))
+            self.growth_logger: logging.RootLogger
+            self.growth_logger = logging.getLogger("growth_logger")
+            self.growth_logger.addHandler(handler3)
+            self.growth_logger.setLevel(logging.INFO)
+            self.growth_logger.info("iteration,coverage_incl,coverage_excl,mdl_gain_incl,mdl_gain_excl")
 
+            self.current_rule = 0
+            self.current_iteration = 0
     
     def candidate_cuts_quantile_midpoints(self, num_candidate_cuts):
         """ Calculate the candidate cuts for each numerical feature, using the quantile midpoints method.

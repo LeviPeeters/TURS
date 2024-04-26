@@ -221,6 +221,7 @@ class Ruleset:
         total_cl = [self.total_cl]
 
         for iter in range(max_iter):
+            self.data_info.current_rule = iter
             if self.data_info.log_learning_process:
                 self.data_info.logger.info("--------------------")
                 self.data_info.logger.info(f"Iteration {iter}")
@@ -234,8 +235,10 @@ class Ruleset:
                 self.add_rule(rule_to_add)
                 total_cl.append(self.total_cl)
                 if self.data_info.log_learning_process:
+                    self.data_info.logger.info("\n")
                     self.data_info.logger.info(f"Added the following rule to the ruleset:")
                     self.data_info.logger.info(str(rule_to_add))
+                    self.data_info.logger.info("\n")
             else:
                 break
 
@@ -360,11 +363,12 @@ class Ruleset:
         counter_worse_best_gain = 0
 
         for i in range(self.data_info.max_grow_iter):
+            self.data_info.current_iteration = i
             if self.data_info.log_learning_process:
                 self.data_info.logger.info("")
-                self.data_info.logger.info(f"    Grow iteration {i}")
-                self.data_info.logger.info(f"    Number of rules for this iteration: {len(rules_for_next_iter)}")
-                self.data_info.logger.info(f"    Total number of candidates: {len(rules_candidates)}")
+                self.data_info.logger.info(f"Grow iteration {i}")
+                self.data_info.logger.info(f"Number of rules for this iteration: {len(rules_for_next_iter)}")
+                self.data_info.logger.info(f"Total number of candidates: {len(rules_candidates)}")
                 self.data_info.logger.info("")
 
             final_beams = {}
@@ -408,7 +412,7 @@ class Ruleset:
             else:
                 rules_for_next_iter = extract_rules_from_beams([final_beams["excl"], final_beams["incl"]])
                 rules_candidates.extend(rules_for_next_iter)
-        
+
         which_best_ = np.argmax([r.incl_gain_per_excl_coverage for r in rules_candidates])
         return rules_candidates[which_best_]
     
@@ -587,7 +591,7 @@ class Ruleset:
         readable = ""
         label_names = self.data_info.alg_config.label_names
         for rule in self.rules:
-            readable += str(rule)
+            readable += rule.to_string(verbose=True)
             readable += "\n"
         readable += "If none of above,\n"
         readable += "Then:\n"

@@ -48,7 +48,6 @@ class Rule:
         self.bool_array = self.get_bool_array(self.indices)
         self.bool_array_excl = self.get_bool_array(self.indices_excl)
 
-
         # Number of instances covered by this rule
         self.coverage = len(self.indices) 
         self.coverage_excl = len(self.indices_excl)
@@ -58,7 +57,6 @@ class Rule:
         self.target = self.data_info.target[indices]
         # self.features_excl = self.data_info.features[indices_excl]
         self.target_excl = self.data_info.target[indices_excl]
-
 
         # Condition matrix containing the rule literals and a boolean array to show which features have a condition
         self.condition_matrix = condition_matrix
@@ -229,7 +227,8 @@ class Rule:
         None
         """
         if log:
-            self.data_info.logger.info(f"Growing rule with coverage {self.coverage} and coverage_excl {self.coverage_excl}")
+            self.data_info.growth_logger.info(f"{self.data_info.current_rule},{self.data_info.current_iteration},{self.coverage},{self.coverage_excl},{self.mdl_gain},{self.mdl_gain_excl}")
+            self.data_info.logger.info(str(self))
         
         candidate_cuts = self.data_info.candidate_cuts
 
@@ -454,12 +453,17 @@ class Rule:
         return (validity > 0)
 
     def __str__(self):
+        return self.to_string()
+
+    def to_string(self, verbose=0):
         """ String representation of the rule for printing
         Should print categorical features in a more readable way
         
         Parameters
         ---
-        None
+        verbose : bool
+            If True, adds all labels and their probabilities at the end of the rule
+            If false, only prints the most likely label and its probablity
             
         Returns
         ---
@@ -521,14 +525,17 @@ class Rule:
             else:
                 readable += f"{feature} == {', '.join([v for v in self.ruleset.data_info.categorical_features[feature] if v not in values])};    "
 
-        readable += "\n"
+        if verbose:
+            readable += "\n"
 
-        readable += "Then:\n"
-        if len(self.prob) > 5:
-            readable += f"Highest probability is {max(self.prob)} for outcome {label_names[np.argmax(self.prob)]}"
+            readable += "Then:\n"
+            if len(self.prob) > 5:
+                readable += f"Highest probability is {max(self.prob)} for outcome {label_names[np.argmax(self.prob)]}"
+            else:
+                for i in range(len(label_names)):
+                    readable += f"Probability of {label_names[i]} is {round(self.prob[i], 2)}\n"
+            readable += f"Coverage of this rule: {self.coverage}\n"
         else:
-            for i in range(len(label_names)):
-                readable += f"Probability of {label_names[i]} is {round(self.prob[i], 2)}\n"
-        readable += f"Coverage of this rule: {self.coverage}\n"
+            readable += f"Then: {label_names[np.argmax(self.prob)]} (p={round(max(self.prob), 2)}, n={self.coverage})"
 
         return readable
