@@ -1,5 +1,6 @@
 import numpy as np
 import math
+import time
 
 import utils_modelencoding
 import DataInfo
@@ -96,7 +97,7 @@ class ModelEncodingDependingOnData:
 
         return l_num_variables + l_which_variables + l_cuts
     
-    def rule_cl_model_dep(self, condition_matrix, col_orders):
+    def rule_cl_model_dep(self, condition_matrix, col_orders, log=False):
         """ Calculate the code length of a rule depending on data.
         Encodes the features one by one, discarding cutting points that become irrelevant as literals are "transmitted".
         Assumes that we can use the data to encode the model, i.e. the model is not needed to decode the data. 
@@ -113,6 +114,8 @@ class ModelEncodingDependingOnData:
         : float
             Code length of the rule
         """
+        if log:
+            s = time.time()
         # Count the conditions on each feature. Can be 0, 1 or 2. 
         condition_count = (~np.isnan(condition_matrix[0])).astype(int) + (~np.isnan(condition_matrix[1])).astype(int)
 
@@ -121,15 +124,25 @@ class ModelEncodingDependingOnData:
         l_which_variables = self.cached_cl_model["l_which_variables"][num_variables]
 
         bool_ = np.ones(self.data_info.features.shape[0], dtype=bool)
+
+        covered_features = self.data_info.features[bool_, :]
+
         l_cuts = 0
+
+        if log:
+            self.data_info.time_logger.info(f"0,{time.time() - s},MDL -> CL model -> CL model dep -> before loop")
+
         for index, col in enumerate(col_orders):
-            # Calculate the bounds of this feature for the remaining data
-            # print(type(self.data_info.features[bool_, [col]]))
-            # print(self.data_info.features[bool_, [col]])
-            up_bound, low_bound = np.max(self.data_info.features[bool_, [col]]), np.min(self.data_info.features[bool_, [col]])
+            s = time.time()
+            feature = covered_features[:, [col]]
+            up_bound, low_bound = np.max(feature), np.min(feature)
+            if log:
+                self.data_info.time_logger.info(f"0,{time.time() - s},MDL -> CL model -> CL model dep -> calculate bounds")
+
+            s = time.time()
             num_cuts = np.count_nonzero((self.data_info.candidate_cuts[col] >= low_bound) &
                                         (self.data_info.candidate_cuts[col] <= up_bound))  # only an approximation here.
-            
+
             # Code lenth required to encode the cutting point(s)
             if condition_count[col] == 1:
                 if num_cuts == 0:
@@ -142,6 +155,10 @@ class ModelEncodingDependingOnData:
                 else:
                     l_cuts += 0
 
+            if log:
+                self.data_info.time_logger.info(f"0,{time.time() - s},MDL -> CL model -> CL model dep -> rest of loop")
+
+            s = time.time()
             # Now that we have "transmitted" a literal, we can drop data that the rule no longer covers
             # This make the code length of the next literal smaller, as some cutting points might not be relevant anymore
             if index != len(col_orders) - 1:
@@ -152,12 +169,15 @@ class ModelEncodingDependingOnData:
                     else:
                         bool_ = bool_ & (self.data_info.features[:, [col]].todense().flatten() > condition_matrix[1, col])
                 else:
-                    bool_ = bool_ & ((self.data_info.features[:, [col]].todense().flatten() <= condition_matrix[0, col]) &
-                                     (self.data_info.features[:, [col]].todense().flatten() > condition_matrix[1, col]))
+                    temp = self.data_info.features[:, [col]].todense().flatten()
+                    bool_ = bool_ & ((temp <= condition_matrix[0, col]) &
+                                     (temp > condition_matrix[1, col]))
+            if log:
+                self.data_info.time_logger.info(f"0,{time.time() - s}, MDL -> CL model -> CL model dep -> drop uncovered data")
 
         return l_num_variables + l_which_variables + l_cuts
 
-    def cl_model_after_growing_rule(self, rule, ruleset, icol, cut_option):
+    def cl_model_after_growing_rule(self, rule, ruleset, icol, cut_option, log=False):
         """ Calculate model code length after growing on a rule.
         If icol and cut_option are not None, the rule is still being grown.
         
@@ -199,8 +219,11 @@ class ModelEncodingDependingOnData:
             
             growing_rule = 1
 
+        s1 = time.time()
         # note that here is a choice based on the assumption that we can use $X$ to encode the model;
-        cl_model_rule_after_growing = self.rule_cl_model_dep(condition_matrix, icols_in_order)
+        cl_model_rule_after_growing = self.rule_cl_model_dep(condition_matrix, icols_in_order, log=log)
+        if log:
+            self.data_info.time_logger.info(f"0,{time.time() - s1},MDL -> CL model -> CL model dep")
 
         # If we are growing a rule, this rule is not in the ruleset yet so we add 1 
         l_num_rules = utils_modelencoding.universal_code_integers(len(ruleset.rules) + growing_rule)

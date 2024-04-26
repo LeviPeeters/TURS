@@ -184,9 +184,9 @@ class Rule:
         s = time.time()
         # Calculate the MDL gain
         info_theo_scores = self.calculate_mdl_gain(bi_array=bi_array, excl_bi_array=excl_bi_array,
-                                                   icol=icol, cut_option=cut_option)
+                                                   icol=icol, cut_option=cut_option, log=log)
         if log:
-            self.data_info.time_logger.info(f"0,{time.time() - s},calculate_mdl_gain")
+            self.data_info.time_logger.info(f"0,{time.time() - s}, MDL gain ")
 
         # Store info in a dictionary
         grow_info = store_grow_info(
@@ -209,7 +209,7 @@ class Rule:
         # Update the beams if the grow step is valid
         # Be careful when multithreading here! Two threads should not update the beam at the same time
         if _validity[f"res_{incl_or_excl}"]:
-            grow_info_beam.update(grow_info, grow_info[f"normalized_gain_{incl_or_excl}"], cov_percent, log=log)
+            grow_info_beam.update(grow_info, grow_info[f"normalized_gain_{incl_or_excl}"], cov_percent)
         
 
     def grow(self, grow_info_beam, incl_or_excl, log=False):
@@ -232,7 +232,6 @@ class Rule:
         
         candidate_cuts = self.data_info.candidate_cuts
 
-        total_time_in_update_grow_beam = 0
         total_time_getting_data = 0
 
         # Consider each feature
@@ -276,7 +275,6 @@ class Rule:
                 if excl_left_coverage == 0 or excl_right_coverage == 0:
                     continue
                 
-                start = time.time()
                 # Update the beam with the results. We do this twice, because a cut can be < or >
                 self.update_grow_beam(bi_array=left_bi_array, excl_bi_array=excl_left_bi_array, icol=icol,
                                       cut=cut, cut_option=constant.LEFT_CUT,
@@ -289,13 +287,11 @@ class Rule:
                                       incl_coverage=incl_right_coverage, excl_coverage=excl_right_coverage,
                                       grow_info_beam=grow_info_beam, incl_or_excl=incl_or_excl,
                                       _validity=_validity, log=log)
-                total_time_in_update_grow_beam += time.time() - start
         
         if log:
-            self.data_info.time_logger.info(f"0,{total_time_in_update_grow_beam},update_grow_beam")
             self.data_info.time_logger.info(f"0,{total_time_getting_data},getting_data")
 
-    def calculate_mdl_gain(self, bi_array, excl_bi_array, icol, cut_option):
+    def calculate_mdl_gain(self, bi_array, excl_bi_array, icol, cut_option, log=False):
         """ Calculate the MDL gain when adding a cut to the rule by calling various functions in the model and data encoding.
         
         Parameters
@@ -317,10 +313,21 @@ class Rule:
 
         data_encoding, model_encoding = self.ruleset.data_encoding, self.ruleset.model_encoding
 
+        s = time.time()
         cl_model = model_encoding.cl_model_after_growing_rule(rule=self, ruleset=self.ruleset, icol=icol,
-                                                                      cut_option=cut_option)
+                                                                      cut_option=cut_option, log=log)
+        if log:
+            self.data_info.time_logger.info(f"0,{time.time() - s},MDL -> CL model")
+        
+        s = time.time()
         cl_data = data_encoding.get_cl_data_incl(self.ruleset, self, excl_bi_array=excl_bi_array, incl_bi_array=bi_array)
+        if log:
+            self.data_info.time_logger.info(f"0,{time.time() - s},MDL -> CL data incl")
+        
+        s = time.time()
         cl_data_excl = data_encoding.get_cl_data_excl(self.ruleset, self, excl_bi_array)
+        if log:
+            self.data_info.time_logger.info(f"0,{time.time() - s},MDL -> CL data excl")
 
         absolute_gain = self.ruleset.total_cl - cl_data - cl_model
         absolute_gain_excl = self.ruleset.total_cl - cl_data_excl - cl_model

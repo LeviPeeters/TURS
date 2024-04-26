@@ -1,5 +1,5 @@
 import numpy as np
-import os
+import time
 from datetime import datetime
 from threading import Thread
 from memory_profiler import profile
@@ -215,7 +215,9 @@ class Ruleset:
         total_cl : float
             Total code length of the ruleset
         """
-        self.data_info.logger.info(f"ruleset.fit")
+        if self.data_info.log_learning_process:
+            self.data_info.logger.info(f"ruleset.fit")
+            self.data_info.start_time = time.time()
 
         # Keep track of CL progression
         total_cl = [self.total_cl]
@@ -244,6 +246,7 @@ class Ruleset:
 
         if self.data_info.log_learning_process:
             self.data_info.logger.info(f"Finished learning process at {datetime.now().strftime('%Y-%m-%d_%H-%M')}")
+            self.data_info.logger.info(f"Total runtime: {time.time() - self.data_info.start_time}")
             self.data_info.logger.info(f"Final ruleset is: ")
             self.data_info.logger.info(str(self))
             self.data_info.logger.info("\n")
@@ -341,7 +344,8 @@ class Ruleset:
           : Rule object
             Rule found by the beam search
         """
-        self.data_info.logger.info(f"ruleset.search_next_rule")
+        if self.data_info.log_learning_process:
+            self.data_info.logger.info(f"ruleset.search_next_rule")
 
         if rule_given is None:
             rule = Rule.Rule(indices=np.arange(self.data_info.nrow), 
@@ -373,19 +377,23 @@ class Ruleset:
 
             final_beams = {}
 
-            # Create threads to search for the best rule in the incl and excl beams
-            threads = [
-                Thread(target=self.search_rule_incl_or_excl, args=(rules_for_next_iter, "incl", final_beams, True)),
-                Thread(target=self.search_rule_incl_or_excl, args=(rules_for_next_iter, "excl", final_beams))
-            ]
+            # # Create threads to search for the best rule in the incl and excl beams
+            # threads = [
+            #     Thread(target=self.search_rule_incl_or_excl, args=(rules_for_next_iter, "incl", final_beams, self.data_info.log_learning_process)),
+            #     Thread(target=self.search_rule_incl_or_excl, args=(rules_for_next_iter, "excl", final_beams))
+            # ]
             
-            # Start the threads
-            for t in threads:
-                t.start()
+            # # Start the threads
+            # for t in threads:
+            #     t.start()
 
-            # Don't continue until both threads are finished
-            for t in threads:
-                t.join()
+            # # Don't continue until both threads are finished
+            # for t in threads:
+            #     t.join()
+
+            # For when we are not using threads
+            self.search_rule_incl_or_excl(rules_for_next_iter, "incl", final_beams, self.data_info.log_learning_process)
+            self.search_rule_incl_or_excl(rules_for_next_iter, "excl", final_beams, False)
 
             # If the beams are empty, stop the search
             if len(final_beams["incl"].gains) == 0 and len(final_beams["excl"].gains) == 0:
@@ -420,7 +428,7 @@ class Ruleset:
         beam_list = []
         for rule in rules_for_next_iter:
             rule: Rule.Rule
-            beam = Beam.DiverseCovBeam(width=self.data_info.beam_width, time_logger=self.data_info.time_logger)
+            beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
             rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl, log=log)
             beam_list.append(beam)
  

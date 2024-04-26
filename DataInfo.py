@@ -6,6 +6,7 @@ import os
 from datetime import datetime
 import logging
 from scipy.sparse import csc_array
+import time
 
 import utils_namedtuple
 import utils_calculating_cl
@@ -46,6 +47,7 @@ class DataInfo:
         self.num_candidate_cuts = self.alg_config.num_candidate_cuts
         self.nrow, self.ncol = X.shape[0], X.shape[1]
         self.log_learning_process = self.alg_config.log_learning_process
+        self.start_time = time.time()
 
         # Make a dictionary of categorical features and their possible values
         self.categorical_features = {}
@@ -76,13 +78,13 @@ class DataInfo:
         
         # Set up logging files
         if self.alg_config.log_learning_process:
-            time = datetime.now().strftime("%Y-%m-%d_%H-%M")
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
             if self.alg_config.log_folder_name:
                 os.mkdir(f"logs/{self.alg_config.log_folder_name}")
                 filename=f"logs/{self.alg_config.log_folder_name}/log"
             else:
-                os.mkdir(f"logs/{time}")
-                filename=f"logs/{time}/log"
+                os.mkdir(f"logs/{timestamp}")
+                filename=f"logs/{timestamp}/log"
 
             # Set up a text logger
             handler = logging.FileHandler(filename=filename+".txt", encoding='utf-8', mode='w')
@@ -93,7 +95,7 @@ class DataInfo:
             self.logger.setLevel(logging.INFO)
 
             # Write the configuration to the log file
-            self.logger.info(f"Log for learning process at {time}\n")
+            self.logger.info(f"Log for learning process at {timestamp}\n")
             self.logger.info(f"Algorithm Configuration:")
             for key, value in self.alg_config._asdict().items():
                 if key != "feature_names":
