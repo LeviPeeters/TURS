@@ -215,7 +215,7 @@ class Ruleset:
         total_cl : float
             Total code length of the ruleset
         """
-        if self.data_info.log_learning_process:
+        if self.data_info.log_learning_process > 0:
             self.data_info.logger.info(f"ruleset.fit")
             self.data_info.start_time = time.time()
 
@@ -224,7 +224,7 @@ class Ruleset:
 
         for iter in range(max_iter):
             self.data_info.current_rule = iter
-            if self.data_info.log_learning_process:
+            if self.data_info.log_learning_process > 0:
                 self.data_info.logger.info("--------------------")
                 self.data_info.logger.info(f"Iteration {iter}")
                 self.data_info.logger.info("--------------------")
@@ -244,16 +244,16 @@ class Ruleset:
             else:
                 break
 
-        if self.data_info.log_learning_process:
+        if self.data_info.log_learning_process > 0:
             self.data_info.logger.info(f"Finished learning process at {datetime.now().strftime('%Y-%m-%d_%H-%M')}")
             self.data_info.logger.info(f"Total runtime: {time.time() - self.data_info.start_time}")
             self.data_info.logger.info(f"Final ruleset is: ")
             self.data_info.logger.info(str(self))
             self.data_info.logger.info("\n")
-            time_report = utils.time_report(f"./logs/{self.data_info.alg_config.log_folder_name}/log_time.csv").to_string()
-            self.data_info.logger.info(f"Time report: \n{time_report}")
+            if self.data_info.log_learning_process > 2:
+                time_report = utils.time_report(f"./logs/{self.data_info.alg_config.log_folder_name}/log_time.csv").to_string()
+                self.data_info.logger.info(f"Time report: \n{time_report}")
 
-    
         return total_cl
 
         
@@ -344,8 +344,6 @@ class Ruleset:
           : Rule object
             Rule found by the beam search
         """
-        if self.data_info.log_learning_process:
-            self.data_info.logger.info(f"ruleset.search_next_rule")
 
         if rule_given is None:
             rule = Rule.Rule(indices=np.arange(self.data_info.nrow), 
@@ -368,7 +366,7 @@ class Ruleset:
 
         for i in range(self.data_info.max_grow_iter):
             self.data_info.current_iteration = i
-            if self.data_info.log_learning_process:
+            if self.data_info.log_learning_process > 0:
                 self.data_info.logger.info("")
                 self.data_info.logger.info(f"Grow iteration {i}")
                 self.data_info.logger.info(f"Number of rules for this iteration: {len(rules_for_next_iter)}")
@@ -379,7 +377,7 @@ class Ruleset:
 
             # # Create threads to search for the best rule in the incl and excl beams
             # threads = [
-            #     Thread(target=self.search_rule_incl_or_excl, args=(rules_for_next_iter, "incl", final_beams, self.data_info.log_learning_process)),
+            #     Thread(target=self.search_rule_incl_or_excl, args=(rules_for_next_iter, "incl", final_beams)),
             #     Thread(target=self.search_rule_incl_or_excl, args=(rules_for_next_iter, "excl", final_beams))
             # ]
             
@@ -392,8 +390,8 @@ class Ruleset:
             #     t.join()
 
             # For when we are not using threads
-            self.search_rule_incl_or_excl(rules_for_next_iter, "incl", final_beams, self.data_info.log_learning_process)
-            self.search_rule_incl_or_excl(rules_for_next_iter, "excl", final_beams, False)
+            self.search_rule_incl_or_excl(rules_for_next_iter, "incl", final_beams)
+            self.search_rule_incl_or_excl(rules_for_next_iter, "excl", final_beams)
 
             # If the beams are empty, stop the search
             if len(final_beams["incl"].gains) == 0 and len(final_beams["excl"].gains) == 0:
@@ -424,12 +422,12 @@ class Ruleset:
         which_best_ = np.argmax([r.incl_gain_per_excl_coverage for r in rules_candidates])
         return rules_candidates[which_best_]
     
-    def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams, log=False):
+    def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
         beam_list = []
         for rule in rules_for_next_iter:
             rule: Rule.Rule
             beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
-            rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl, log=log)
+            rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
             beam_list.append(beam)
  
         # Combine the beams and make GrowInfoBeam objects to store them
