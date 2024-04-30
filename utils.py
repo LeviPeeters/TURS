@@ -2,6 +2,7 @@ from pycallgraph2 import PyCallGraph, Config, GlobbingFilter, output
 import logging
 import time
 import pandas as pd
+import matplotlib.pyplot as plt
 
 def call_graph_filtered(
         function_, 
@@ -31,11 +32,22 @@ class ElapsedTimeFormatter(logging.Formatter):
         self.start_time = time.time()
         return f"{elapsed} - {record.getMessage()}"
 
-def time_report(csv_filename):
+def time_report(log_folder_path):
     # Read the csv file into a pandas dataframe
-    df = pd.read_csv(csv_filename)
+    df = pd.read_csv(f"{log_folder_path}/log_time.csv")
 
     df = df.groupby("Function").agg(Total_time=('Time', 'sum'), Total_visits=('Time', 'count')).sort_values("Total_time", ascending=False).reset_index()
     df["Average_time_per_visit"] = df["Total_time"] / df["Total_visits"]
+
+    return df
+
+def time_report_boxplot(log_folder_path):
+    df = pd.read_csv(f"{log_folder_path}/log_time.csv")
+    plt.figure(figsize=(10, 5))
+    for i, name in enumerate(df["Function"].unique()):
+        plt.boxplot(df.loc[df["Function"] == name, "Time"].values, labels=[name], positions=[i], vert=False)
+    
+    plt.tight_layout()
+    plt.savefig(f"{log_folder_path}/time_report_boxplot.png")
 
     return df

@@ -251,8 +251,9 @@ class Ruleset:
             self.data_info.logger.info(str(self))
             self.data_info.logger.info("\n")
             if self.data_info.log_learning_process > 2:
-                time_report = utils.time_report(f"./logs/{self.data_info.alg_config.log_folder_name}/log_time.csv").to_string()
+                time_report = utils.time_report(f"./logs/{self.data_info.alg_config.log_folder_name}").to_string()
                 self.data_info.logger.info(f"Time report: \n{time_report}")
+                utils.time_report_boxplot(f"./logs/{self.data_info.alg_config.log_folder_name}")
 
         return total_cl
 
@@ -390,8 +391,8 @@ class Ruleset:
             #     t.join()
 
             # For when we are not using threads
-            self.search_rule_incl_or_excl(rules_for_next_iter, "incl", final_beams)
-            self.search_rule_incl_or_excl(rules_for_next_iter, "excl", final_beams)
+            self.search_rule_incl_or_excl(rules_for_next_iter, "incl", final_beams, log=bool(self.data_info.log_learning_process))
+            self.search_rule_incl_or_excl(rules_for_next_iter, "excl", final_beams, log=bool(self.data_info.log_learning_process))
 
             # If the beams are empty, stop the search
             if len(final_beams["incl"].gains) == 0 and len(final_beams["excl"].gains) == 0:
@@ -422,12 +423,15 @@ class Ruleset:
         which_best_ = np.argmax([r.incl_gain_per_excl_coverage for r in rules_candidates])
         return rules_candidates[which_best_]
     
-    def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams):
+    def search_rule_incl_or_excl(self, rules_for_next_iter, incl_or_excl, final_beams, log=False):
         beam_list = []
+
+        if self.data_info.log_learning_process > 0 and log:
+            self.data_info.logger.info(f"Searching for rule in {incl_or_excl} beam.")
         for rule in rules_for_next_iter:
             rule: Rule.Rule
             beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
-            rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
+            rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl, log=log)
             beam_list.append(beam)
  
         # Combine the beams and make GrowInfoBeam objects to store them

@@ -142,7 +142,7 @@ class Rule:
         return candidate_cuts_icol
 
     def update_grow_beam(self, bi_array, excl_bi_array, icol, cut, cut_option, incl_coverage, excl_coverage,
-                         grow_info_beam: Beam.GrowInfoBeam, incl_or_excl, _validity):
+                         grow_info_beam: Beam.GrowInfoBeam, incl_or_excl, _validity, log=False):
         """ Use information of a grow step to update the beam.
 
         Parameters
@@ -178,9 +178,9 @@ class Rule:
         s = time.time()
         # Calculate the MDL gain
         info_theo_scores = self.calculate_mdl_gain(bi_array=bi_array, excl_bi_array=excl_bi_array,
-                                                   icol=icol, cut_option=cut_option)
+                                                   icol=icol, cut_option=cut_option, log=log)
         
-        if self.data_info.alg_config.log_learning_process > 2:
+        if self.data_info.alg_config.log_learning_process > 2 and log:
             self.data_info.time_logger.info(f"0,{time.time() - s}, MDL gain ")
 
         # Store info in a dictionary
@@ -207,7 +207,7 @@ class Rule:
             grow_info_beam.update(grow_info, grow_info[f"normalized_gain_{incl_or_excl}"], cov_percent)
         
 
-    def grow(self, grow_info_beam, incl_or_excl):
+    def grow(self, grow_info_beam, incl_or_excl, log=False):
         """ Grow the rule by one step and update the 
         
         Parameters
@@ -221,9 +221,9 @@ class Rule:
         ---
         None
         """
-        if self.data_info.alg_config.log_learning_process > 0:
+        if self.data_info.alg_config.log_learning_process > 0 and log:
             self.data_info.growth_logger.info(f"{self.data_info.current_rule},{self.data_info.current_iteration},{self.coverage},{self.coverage_excl},{self.mdl_gain},{self.mdl_gain_excl}")
-        if self.data_info.alg_config.log_learning_process > 1:    
+        if self.data_info.alg_config.log_learning_process > 1 and log:    
             self.data_info.logger.info(str(self))
         
         candidate_cuts = self.data_info.candidate_cuts
@@ -276,17 +276,15 @@ class Rule:
                                       cut=cut, cut_option=constant.LEFT_CUT,
                                       incl_coverage=incl_left_coverage, excl_coverage=excl_left_coverage,
                                       grow_info_beam=grow_info_beam, incl_or_excl=incl_or_excl,
-                                      _validity=_validity)
+                                      _validity=_validity, log=log)
 
                 self.update_grow_beam(bi_array=right_bi_array, excl_bi_array=excl_right_bi_array, icol=icol,
                                       cut=cut, cut_option=constant.RIGHT_CUT,
                                       incl_coverage=incl_right_coverage, excl_coverage=excl_right_coverage,
                                       grow_info_beam=grow_info_beam, incl_or_excl=incl_or_excl,
-                                      _validity=_validity)
-        if self.data_info.alg_config.log_learning_process > 1:
-            self.data_info.logger.info(f"Grow step complete")
-            
-        if self.data_info.alg_config.log_learning_process > 2:
+                                      _validity=_validity, log=log)
+
+        if self.data_info.alg_config.log_learning_process > 2 and log:
             self.data_info.time_logger.info(f"0,{total_time_getting_data},getting_data")
 
     def calculate_mdl_gain(self, bi_array, excl_bi_array, icol, cut_option, log=False):
@@ -313,19 +311,19 @@ class Rule:
 
         s = time.time()
         cl_model = model_encoding.cl_model_after_growing_rule(rule=self, ruleset=self.ruleset, icol=icol,
-                                                                      cut_option=cut_option)
-        if self.data_info.alg_config.log_learning_process > 2:
-            self.data_info.time_logger.info(f"0,{time.time() - s},MDL -> CL model")
+                                                                      cut_option=cut_option, log=log)
+        if self.data_info.alg_config.log_learning_process > 2 and log:
+            self.data_info.time_logger.info(f"0,{time.time() - s},CL model")
         
         s = time.time()
         cl_data = data_encoding.get_cl_data_incl(self.ruleset, self, excl_bi_array=excl_bi_array, incl_bi_array=bi_array)
-        if self.data_info.alg_config.log_learning_process > 2:
-            self.data_info.time_logger.info(f"0,{time.time() - s},MDL -> CL data incl")
+        if self.data_info.alg_config.log_learning_process > 2 and log:
+            self.data_info.time_logger.info(f"0,{time.time() - s},CL data incl")
         
         s = time.time()
         cl_data_excl = data_encoding.get_cl_data_excl(self.ruleset, self, excl_bi_array)
-        if self.data_info.alg_config.log_learning_process > 2:
-            self.data_info.time_logger.info(f"0,{time.time() - s},MDL -> CL data excl")
+        if self.data_info.alg_config.log_learning_process > 2 and log:
+            self.data_info.time_logger.info(f"0,{time.time() - s},CL data excl")
 
         absolute_gain = self.ruleset.total_cl - cl_data - cl_model
         absolute_gain_excl = self.ruleset.total_cl - cl_data_excl - cl_model
