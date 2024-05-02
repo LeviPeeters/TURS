@@ -48,7 +48,6 @@ class Rule:
         self.bool_array = self.get_bool_array(self.indices)
         self.bool_array_excl = self.get_bool_array(self.indices_excl)
 
-
         # Number of instances covered by this rule
         self.coverage = len(self.indices) 
         self.coverage_excl = len(self.indices_excl)
@@ -58,7 +57,6 @@ class Rule:
         self.target = self.data_info.target[indices]
         # self.features_excl = self.data_info.features[indices_excl]
         self.target_excl = self.data_info.target[indices_excl]
-
 
         # Condition matrix containing the rule literals and a boolean array to show which features have a condition
         self.condition_matrix = condition_matrix
@@ -134,16 +132,10 @@ class Rule:
             List of candidate cuts for the feature 
         """
         if self.rule_base is None:
-            # candidate_cuts_selector = (candidate_cuts[icol] < np.max(self.features_excl[:, icol])) & \
-            #                           (candidate_cuts[icol] > np.min(self.features_excl[:, icol]))
             candidate_cuts_selector = (candidate_cuts[icol] < np.max(self.data_info.features[self.indices_excl, [icol]].flatten())) & \
                                       (candidate_cuts[icol] > np.min(self.data_info.features[self.indices_excl, [icol]].flatten()))
             candidate_cuts_icol = candidate_cuts[icol][candidate_cuts_selector]
-            # print(candidate_cuts[icol])# < np.max(self.data_info.features[self.indices_excl, [icol]]))
-            # breakpoint()
         else:
-            # candidate_cuts_selector = (candidate_cuts[icol] < np.max(self.features[:, icol])) & \
-            #                           (candidate_cuts[icol] > np.min(self.features[:, icol]))
             candidate_cuts_selector = (candidate_cuts[icol] < np.max(self.data_info.features[self.indices, [icol]])) & \
                                       (candidate_cuts[icol] > np.min(self.data_info.features[self.indices, [icol]]))
             candidate_cuts_icol = candidate_cuts[icol][candidate_cuts_selector]
@@ -186,9 +178,10 @@ class Rule:
         s = time.time()
         # Calculate the MDL gain
         info_theo_scores = self.calculate_mdl_gain(bi_array=bi_array, excl_bi_array=excl_bi_array,
-                                                   icol=icol, cut_option=cut_option)
-        if log:
-            self.data_info.time_logger.info(f"0,{time.time() - s},calculate_mdl_gain")
+                                                   icol=icol, cut_option=cut_option, log=log)
+        
+        if self.data_info.alg_config.log_learning_process > 2 and log:
+            self.data_info.time_logger.info(f"0,{time.time() - s}, MDL gain ")
 
         # Store info in a dictionary
         grow_info = store_grow_info(
@@ -211,7 +204,7 @@ class Rule:
         # Update the beams if the grow step is valid
         # Be careful when multithreading here! Two threads should not update the beam at the same time
         if _validity[f"res_{incl_or_excl}"]:
-            grow_info_beam.update(grow_info, grow_info[f"normalized_gain_{incl_or_excl}"], cov_percent, log=log)
+            grow_info_beam.update(grow_info, grow_info[f"normalized_gain_{incl_or_excl}"], cov_percent)
         
 
     def grow(self, grow_info_beam, incl_or_excl, log=False):
@@ -228,12 +221,13 @@ class Rule:
         ---
         None
         """
-        if log:
-            self.data_info.logger.info(f"Growing rule with coverage {self.coverage} and coverage_excl {self.coverage_excl}")
+        if self.data_info.alg_config.log_learning_process > 0 and log:
+            self.data_info.growth_logger.info(f"{self.data_info.current_rule},{self.data_info.current_iteration},{self.coverage},{self.coverage_excl},{self.mdl_gain},{self.mdl_gain_excl}")
+        if self.data_info.alg_config.log_learning_process > 1 and log:    
+            self.data_info.logger.info(str(self))
         
         candidate_cuts = self.data_info.candidate_cuts
 
-        total_time_in_update_grow_beam = 0
         total_time_getting_data = 0
 
         # Consider each feature
@@ -277,7 +271,6 @@ class Rule:
                 if excl_left_coverage == 0 or excl_right_coverage == 0:
                     continue
                 
-                start = time.time()
                 # Update the beam with the results. We do this twice, because a cut can be < or >
                 self.update_grow_beam(bi_array=left_bi_array, excl_bi_array=excl_left_bi_array, icol=icol,
                                       cut=cut, cut_option=constant.LEFT_CUT,
@@ -290,13 +283,11 @@ class Rule:
                                       incl_coverage=incl_right_coverage, excl_coverage=excl_right_coverage,
                                       grow_info_beam=grow_info_beam, incl_or_excl=incl_or_excl,
                                       _validity=_validity, log=log)
-                total_time_in_update_grow_beam += time.time() - start
-        
-        if log:
-            self.data_info.time_logger.info(f"0,{total_time_in_update_grow_beam},update_grow_beam")
+
+        if self.data_info.alg_config.log_learning_process > 2 and log:
             self.data_info.time_logger.info(f"0,{total_time_getting_data},getting_data")
 
-    def calculate_mdl_gain(self, bi_array, excl_bi_array, icol, cut_option):
+    def calculate_mdl_gain(self, bi_array, excl_bi_array, icol, cut_option, log=False):
         """ Calculate the MDL gain when adding a cut to the rule by calling various functions in the model and data encoding.
         
         Parameters
@@ -318,10 +309,21 @@ class Rule:
 
         data_encoding, model_encoding = self.ruleset.data_encoding, self.ruleset.model_encoding
 
+        s = time.time()
         cl_model = model_encoding.cl_model_after_growing_rule(rule=self, ruleset=self.ruleset, icol=icol,
-                                                                      cut_option=cut_option)
+                                                                      cut_option=cut_option, log=log)
+        if self.data_info.alg_config.log_learning_process > 2 and log:
+            self.data_info.time_logger.info(f"0,{time.time() - s},CL model")
+        
+        s = time.time()
         cl_data = data_encoding.get_cl_data_incl(self.ruleset, self, excl_bi_array=excl_bi_array, incl_bi_array=bi_array)
+        if self.data_info.alg_config.log_learning_process > 2 and log:
+            self.data_info.time_logger.info(f"0,{time.time() - s},CL data incl")
+        
+        s = time.time()
         cl_data_excl = data_encoding.get_cl_data_excl(self.ruleset, self, excl_bi_array)
+        if self.data_info.alg_config.log_learning_process > 2 and log:
+            self.data_info.time_logger.info(f"0,{time.time() - s},CL data excl")
 
         absolute_gain = self.ruleset.total_cl - cl_data - cl_model
         absolute_gain_excl = self.ruleset.total_cl - cl_data_excl - cl_model
@@ -454,12 +456,17 @@ class Rule:
         return (validity > 0)
 
     def __str__(self):
+        return self.to_string()
+
+    def to_string(self, verbose=0):
         """ String representation of the rule for printing
         Should print categorical features in a more readable way
         
         Parameters
         ---
-        None
+        verbose : bool
+            If True, adds all labels and their probabilities at the end of the rule
+            If false, only prints the most likely label and its probablity
             
         Returns
         ---
@@ -521,14 +528,17 @@ class Rule:
             else:
                 readable += f"{feature} == {', '.join([v for v in self.ruleset.data_info.categorical_features[feature] if v not in values])};    "
 
-        readable += "\n"
+        if verbose:
+            readable += "\n"
 
-        readable += "Then:\n"
-        if len(self.prob) > 5:
-            readable += f"Highest probability is {max(self.prob)} for outcome {label_names[np.argmax(self.prob)]}"
+            readable += "Then:\n"
+            if len(self.prob) > 5:
+                readable += f"Highest probability is {max(self.prob)} for outcome {label_names[np.argmax(self.prob)]}"
+            else:
+                for i in range(len(label_names)):
+                    readable += f"Probability of {label_names[i]} is {round(self.prob[i], 2)}\n"
+            readable += f"Coverage of this rule: {self.coverage}\n"
         else:
-            for i in range(len(label_names)):
-                readable += f"Probability of {label_names[i]} is {round(self.prob[i], 2)}\n"
-        readable += f"Coverage of this rule: {self.coverage}\n"
+            readable += f"Then: {label_names[np.argmax(self.prob)]} (p={round(max(self.prob), 2)}, n={self.coverage})"
 
         return readable

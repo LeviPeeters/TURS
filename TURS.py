@@ -16,7 +16,7 @@ class TURS():
                     max_grow_iter: int = 500,
                     num_class_as_given: int = None,
                     beam_width: int = 10,
-                    log_learning_process: bool = True,
+                    log_learning_process: int = 1,
                     log_folder_name: str = None,
                     dataset_name: str = None,
                     feature_names: list = None,

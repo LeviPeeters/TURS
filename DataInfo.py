@@ -6,6 +6,7 @@ import os
 from datetime import datetime
 import logging
 from scipy.sparse import csc_array
+import time
 
 import utils_namedtuple
 import utils_calculating_cl
@@ -21,7 +22,7 @@ class DataInfo:
                 max_grow_iter=200, 
                 num_class_as_given=None,
                 beam_width=beam_width,
-                log_learning_process=False,
+                log_learning_process=1,
                 dataset_name=None,
                 feature_names=["X" + str(i) for i in range(X.shape[1])],
                 label_names=np.unique(y),
@@ -46,6 +47,7 @@ class DataInfo:
         self.num_candidate_cuts = self.alg_config.num_candidate_cuts
         self.nrow, self.ncol = X.shape[0], X.shape[1]
         self.log_learning_process = self.alg_config.log_learning_process
+        self.start_time = time.time()
 
         # Make a dictionary of categorical features and their possible values
         self.categorical_features = {}
@@ -75,14 +77,14 @@ class DataInfo:
         self.cached_number_of_rules_for_cl_model = self.alg_config.max_grow_iter
         
         # Set up logging files
-        if self.alg_config.log_learning_process:
-            time = datetime.now().strftime("%Y-%m-%d_%H-%M")
+        if self.alg_config.log_learning_process > 0:
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
             if self.alg_config.log_folder_name:
                 os.mkdir(f"logs/{self.alg_config.log_folder_name}")
                 filename=f"logs/{self.alg_config.log_folder_name}/log"
             else:
-                os.mkdir(f"logs/{time}")
-                filename=f"logs/{time}/log"
+                os.mkdir(f"logs/{timestamp}")
+                filename=f"logs/{timestamp}/log"
 
             # Set up a text logger
             handler = logging.FileHandler(filename=filename+".txt", encoding='utf-8', mode='w')
@@ -93,23 +95,35 @@ class DataInfo:
             self.logger.setLevel(logging.INFO)
 
             # Write the configuration to the log file
-            self.logger.info(f"Log for learning process at {time}\n")
+            self.logger.info(f"Log for learning process at {timestamp}\n")
             self.logger.info(f"Algorithm Configuration:")
             for key, value in self.alg_config._asdict().items():
                 if key != "feature_names":
                     self.logger.info(f"{key}: {value}")
+            self.logger.info("Number of features: " + str(self.ncol))
             self.logger.info("\n")
 
+            # For logging information about the growth process to a CSV file
+            handler3 = logging.FileHandler(filename=filename+"_growth.csv", encoding='utf-8', mode='w')
+            handler3.setFormatter(logging.Formatter('%(message)s'))
+            self.growth_logger: logging.RootLogger
+            self.growth_logger = logging.getLogger("growth_logger")
+            self.growth_logger.addHandler(handler3)
+            self.growth_logger.setLevel(logging.INFO)
+            self.growth_logger.info("rule,iteration,coverage_incl,coverage_excl,mdl_gain_incl,mdl_gain_excl")
 
-            handler2 = logging.FileHandler(filename=filename+"_time.csv", encoding='utf-8', mode='w')
-            handler2.setFormatter(logging.Formatter('%(message)s'))
-            self.time_logger: logging.RootLogger
-            self.time_logger = logging.getLogger("time_logger")
-            self.time_logger.addHandler(handler2)
-            self.time_logger.setLevel(logging.INFO)
-            self.time_logger.info("Thread,Time,Function")
+            self.current_rule = 0
+            self.current_iteration = 0
 
-
+            if self.log_learning_process > 2:
+                # For logging the time taken for each function to a CSV file
+                handler2 = logging.FileHandler(filename=filename+"_time.csv", encoding='utf-8', mode='w')
+                handler2.setFormatter(logging.Formatter('%(message)s'))
+                self.time_logger: logging.RootLogger
+                self.time_logger = logging.getLogger("time_logger")
+                self.time_logger.addHandler(handler2)
+                self.time_logger.setLevel(logging.INFO)
+                self.time_logger.info("Thread,Time,Function")
     
     def candidate_cuts_quantile_midpoints(self, num_candidate_cuts):
         """ Calculate the candidate cuts for each numerical feature, using the quantile midpoints method.

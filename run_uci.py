@@ -36,7 +36,7 @@ else:
     fold_given = 0
 
 d = utils_dataprep.read_data(data_name)
-X, y, class_labels = utils_dataprep.preprocess_sparse(d)
+X, y, class_labels, feature_names = utils_dataprep.preprocess_sparse(d)
 
 kf = StratifiedKFold(n_splits=5, shuffle=True,
                      random_state=2)  # can also use sklearn.model_selection.StratifiedKFold
@@ -45,6 +45,7 @@ kfold_list = list(kfold)
 
 times = []
 first_run = True # to avoid logging multiple folds
+
 
 for fold in range(5):
     if fold_given is not None and fold != fold_given:
@@ -64,10 +65,10 @@ for fold in range(5):
         max_grow_iter=500,
         num_class_as_given=None,
         beam_width=10,
-        log_learning_process=True and first_run,
+        log_learning_process=3 if first_run else 0,
         log_folder_name=datetime.now().strftime("%Y%m%d_%H%M%s") + "_" + data_name,
         dataset_name=None,
-        feature_names=d.columns[:-1],
+        feature_names=feature_names,
         which_features=None,
         random_seed=None,
         label_names=class_labels,
