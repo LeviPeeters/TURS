@@ -84,7 +84,7 @@ class DiverseCovBeam:
         self.worst_gain = None
         self.width = width
 
-    def update(self, info, gain, coverage_percentage):
+    def update(self, info, gain):
         """ Update the beam with a new growth step. 
         
         
@@ -98,7 +98,7 @@ class DiverseCovBeam:
             Coverage percentage of the growth step
         """
         # Find which coverage interval the new step belongs to
-        which_coverage_interval = np.searchsorted(a=self.coverage_percentage, v=coverage_percentage)
+        which_coverage_interval = np.searchsorted(a=self.coverage_percentage, v=info["coverage_percentage"])
         
         # If this interval is empty, add the new step
         if self.infos[which_coverage_interval] is None:

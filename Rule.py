@@ -287,6 +287,94 @@ class Rule:
         if self.data_info.alg_config.log_learning_process > 2 and log:
             self.data_info.time_logger.info(f"0,{total_time_getting_data},getting_data")
 
+    def grow_one_literal(self, incl_or_excl, icol, cut, log=False):
+        # Sparse: The binary array needs to be converted to dense and flattened, as sparse matrices do not reduce in dimension after slicing
+        bi_array = self.data_info.features[:, [icol]].todense().flatten()
+
+        # Construct binary arrays indicating which features fall on each side of the cut
+        excl_left_bi_array = (bi_array[self.indices_excl] < cut)
+        excl_right_bi_array = ~excl_left_bi_array
+        left_bi_array = (bi_array[self.indices] < cut)
+        right_bi_array = ~left_bi_array
+
+        # Store all of the binary arrays in a dictionary to make them easy to pass to validity check
+        bi_arrays = {"left": left_bi_array, 
+                        "right": right_bi_array, 
+                        "excl_left": excl_left_bi_array,
+                        "excl_right": excl_right_bi_array}
+
+        # Check validity and skip if not valid
+        _validity = self.validity_check(icol=icol, cut=cut, bi_arrays=bi_arrays)
+
+        if self.data_info.not_use_excl_:
+            _validity["res_excl"] = False
+
+        if _validity["res_excl"] == False and _validity["res_incl"] == False:
+            return None, None
+
+        incl_left_coverage, incl_right_coverage = np.count_nonzero(left_bi_array), np.count_nonzero(
+            right_bi_array)
+        excl_left_coverage, excl_right_coverage = np.count_nonzero(excl_left_bi_array), np.count_nonzero(
+            excl_right_bi_array)
+
+        # Question: Why is there no check on incl_coverage being 0?
+        if excl_left_coverage == 0 or excl_right_coverage == 0:
+            return None, None
+
+        # Calculate the MDL gain
+        info_theo_scores = self.calculate_mdl_gain(bi_array=right_bi_array, excl_bi_array=excl_right_bi_array,
+                                                icol=icol, cut_option=constant.RIGHT_CUT, log=log)
+
+        # Store info in a dictionary
+        right_grow_info = store_grow_info(
+            excl_bi_array=excl_right_bi_array, incl_bi_array=right_bi_array, icol=icol,
+            cut=cut, cut_option=constant.RIGHT_CUT, incl_mdl_gain=info_theo_scores["absolute_gain"],
+            excl_mdl_gain=info_theo_scores["absolute_gain_excl"],
+            coverage_excl=excl_right_coverage, coverage_incl=incl_right_coverage,
+            normalized_gain_excl=info_theo_scores["absolute_gain_excl"] / excl_right_coverage,
+            normalized_gain_incl=info_theo_scores["absolute_gain"] / excl_right_coverage, # Question: Shouldn't this be incl_coverage?    
+            _rule=self
+        )
+
+        # Ratio of coverage after the grow step to the coverage of the rule before the grow step
+        # This is the gain of the grow step
+        if incl_or_excl == "incl":
+            right_grow_info[f"coverage_percentage"] = right_grow_info[f"coverage_incl"] / self.coverage
+        else:
+            right_grow_info[f"coverage_percentage"] = right_grow_info[f"coverage_excl"] / self.coverage_excl                
+
+        
+        # Calculate the MDL gain
+        info_theo_scores = self.calculate_mdl_gain(bi_array=left_bi_array, excl_bi_array=excl_left_bi_array,
+                                                icol=icol, cut_option=constant.LEFT_CUT, log=log)
+
+        # Store info in a dictionary
+        left_grow_info = store_grow_info(
+            excl_bi_array=excl_left_bi_array, incl_bi_array=left_bi_array, icol=icol,
+            cut=cut, cut_option=constant.LEFT_CUT, incl_mdl_gain=info_theo_scores["absolute_gain"],
+            excl_mdl_gain=info_theo_scores["absolute_gain_excl"],
+            coverage_excl=excl_left_coverage, coverage_incl=incl_left_coverage,
+            normalized_gain_excl=info_theo_scores["absolute_gain_excl"] / excl_left_coverage,
+            normalized_gain_incl=info_theo_scores["absolute_gain"] / excl_left_coverage, # Question: Shouldn't this be incl_coverage?    
+            _rule=self
+        )
+
+        # Ratio of coverage after the grow step to the coverage of the rule before the grow step
+        # This is the gain of the grow step
+        if incl_or_excl == "incl":
+            left_grow_info[f"coverage_percentage"] = left_grow_info[f"coverage_incl"] / self.coverage
+        else:
+            left_grow_info[f"coverage_percentage"] = left_grow_info[f"coverage_excl"] / self.coverage_excl
+
+        # Update the beams if the grow step is valid
+        # Be careful when multithreading here! Two threads should not update the beam at the same time
+        if _validity[f"res_{incl_or_excl}"]:
+            return left_grow_info, right_grow_info
+        return None, None
+            
+            
+            
+
     def calculate_mdl_gain(self, bi_array, excl_bi_array, icol, cut_option, log=False):
         """ Calculate the MDL gain when adding a cut to the rule by calling various functions in the model and data encoding.
         
