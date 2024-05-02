@@ -1,11 +1,14 @@
 import numpy as np
 import sys
+import dill
+import weakref
 
 import utils_calculating_cl
 import nml_regret
 import Beam
 import DataInfo
 import time
+
 
 import constant
 
@@ -53,9 +56,7 @@ class Rule:
         self.coverage_excl = len(self.indices_excl)
 
         # The feature arrays take up far too much memory, especially because empty rules cover the entire dataset\
-        # self.features = self.data_info.features[indices]
         self.target = self.data_info.target[indices]
-        # self.features_excl = self.data_info.features[indices_excl]
         self.target_excl = self.data_info.target[indices_excl]
 
         # Condition matrix containing the rule literals and a boolean array to show which features have a condition
@@ -82,8 +83,6 @@ class Rule:
                 self.incl_gain_per_excl_coverage, self.excl_gain_per_excl_coverage = np.nan, np.nan
             else:
                 self.incl_gain_per_excl_coverage, self.excl_gain_per_excl_coverage = mdl_gain / self.coverage_excl, mdl_gain_excl / self.coverage_excl
-
-
 
     def _calc_probs(self, target):
         """ Given a vector containing the targets of a set of instances, calculate the probability of encountering each target.
@@ -287,7 +286,7 @@ class Rule:
         if self.data_info.alg_config.log_learning_process > 2 and log:
             self.data_info.time_logger.info(f"0,{total_time_getting_data},getting_data")
 
-    def grow_one_literal(self, incl_or_excl, icol, cut, log=False):
+    def grow_one_literal(self, incl_or_excl, icol, cut, left, right, log=False):
         # Sparse: The binary array needs to be converted to dense and flattened, as sparse matrices do not reduce in dimension after slicing
         bi_array = self.data_info.features[:, [icol]].todense().flatten()
 
@@ -310,7 +309,7 @@ class Rule:
             _validity["res_excl"] = False
 
         if _validity["res_excl"] == False and _validity["res_incl"] == False:
-            return None, None
+            return 
 
         incl_left_coverage, incl_right_coverage = np.count_nonzero(left_bi_array), np.count_nonzero(
             right_bi_array)
@@ -319,7 +318,7 @@ class Rule:
 
         # Question: Why is there no check on incl_coverage being 0?
         if excl_left_coverage == 0 or excl_right_coverage == 0:
-            return None, None
+            return 
 
         # Calculate the MDL gain
         info_theo_scores = self.calculate_mdl_gain(bi_array=right_bi_array, excl_bi_array=excl_right_bi_array,
@@ -332,7 +331,7 @@ class Rule:
             excl_mdl_gain=info_theo_scores["absolute_gain_excl"],
             coverage_excl=excl_right_coverage, coverage_incl=incl_right_coverage,
             normalized_gain_excl=info_theo_scores["absolute_gain_excl"] / excl_right_coverage,
-            normalized_gain_incl=info_theo_scores["absolute_gain"] / excl_right_coverage, # Question: Shouldn't this be incl_coverage?    
+            normalized_gain_incl=info_theo_scores["absolute_gain"] / excl_right_coverage, # Question: Shouldn't this be incl_coverage? 
             _rule=self
         )
 
@@ -367,9 +366,9 @@ class Rule:
             left_grow_info[f"coverage_percentage"] = left_grow_info[f"coverage_excl"] / self.coverage_excl
 
         # Update the beams if the grow step is valid
-        # Be careful when multithreading here! Two threads should not update the beam at the same time
         if _validity[f"res_{incl_or_excl}"]:
-            return left_grow_info, right_grow_info
+            left.append( left_grow_info ) 
+            right.append( right_grow_info ) 
         return None, None
             
             

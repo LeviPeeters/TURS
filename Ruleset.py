@@ -1,9 +1,9 @@
 import numpy as np
 import time
 from datetime import datetime
-from threading import Thread
 from memory_profiler import profile
-from guppy import hpy
+import multiprocessing as mp
+import dill
 
 import Rule
 import Beam
@@ -115,9 +115,6 @@ class Ruleset:
             self.constraints = {}
         else:
             self.constraints = constraints
-
-        
-        self.hp = hpy()
         
         
 
@@ -376,20 +373,6 @@ class Ruleset:
 
             final_beams = {}
 
-            # # Create threads to search for the best rule in the incl and excl beams
-            # threads = [
-            #     Thread(target=self.search_rule_incl_or_excl, args=(rules_for_next_iter, "incl", final_beams)),
-            #     Thread(target=self.search_rule_incl_or_excl, args=(rules_for_next_iter, "excl", final_beams))
-            # ]
-            
-            # # Start the threads
-            # for t in threads:
-            #     t.start()
-
-            # # Don't continue until both threads are finished
-            # for t in threads:
-            #     t.join()
-
             # For when we are not using threads
             self.search_rule_incl_or_excl(rules_for_next_iter, "incl", final_beams, log=bool(self.data_info.log_learning_process))
             self.search_rule_incl_or_excl(rules_for_next_iter, "excl", final_beams, log=bool(self.data_info.log_learning_process))
@@ -431,8 +414,9 @@ class Ruleset:
         for rule in rules_for_next_iter:
             rule: Rule.Rule
             beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
-            left, right = [], []
-
+            manager = mp.Manager()
+            left, right = manager.list(), manager.list()
+            
             candidate_cuts = self.data_info.candidate_cuts
 
             # Make a list of all literals to be grown
@@ -442,17 +426,21 @@ class Ruleset:
                 for cut in candidate_cuts_icol:
                     literals.append((icol, cut))
 
-            for literal in literals:
-                left_grow_info, right_grow_info = rule.grow_one_literal(incl_or_excl=incl_or_excl, icol=literal[0], cut=literal[1], log=log)
-                left.append(left_grow_info)
-                right.append(right_grow_info)
+            # Create a worker pool to grow the literals in parallel
+            pool = mp.Pool(mp.cpu_count())
+
+            pool.starmap_async(rule.grow_one_literal, [(incl_or_excl, literal[0], literal[1], left, right, log) for literal in literals], chunksize=8)
+            pool.close()
+
+            # print(len(left), len(right))
 
             for left_grow_info, right_grow_info in zip(left, right):
                 if left_grow_info is None or right_grow_info is None:
                     continue
+                # left_grow_info["_rule"] = rule
+                # right_grow_info["_rule"] = rule
                 beam.update(left_grow_info, left_grow_info[f"normalized_gain_{incl_or_excl}"])
                 beam.update(right_grow_info, right_grow_info[f"normalized_gain_{incl_or_excl}"])
-            # rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl, log=log)
             beam_list.append(beam)
  
         # Combine the beams and make GrowInfoBeam objects to store them
