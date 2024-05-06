@@ -413,9 +413,15 @@ class Ruleset:
             self.data_info.logger.info(f"Searching for rule in {incl_or_excl} beam.")
         for rule in rules_for_next_iter:
             rule: Rule.Rule
+
+            if self.data_info.alg_config.log_learning_process > 0 and log:
+                self.data_info.growth_logger.info(f"{self.data_info.current_rule},{self.data_info.current_iteration},{rule.coverage},{rule.coverage_excl},{rule.mdl_gain},{rule.mdl_gain_excl}")
+            if self.data_info.alg_config.log_learning_process > 1 and log:    
+                self.data_info.logger.info(str(rule))
+
             beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
             manager = mp.Manager()
-            left, right = manager.list(), manager.list()
+            results = manager.list()
             
             candidate_cuts = self.data_info.candidate_cuts
 
@@ -429,16 +435,21 @@ class Ruleset:
             # Create a worker pool to grow the literals in parallel
             pool = mp.Pool(mp.cpu_count())
 
-            pool.starmap_async(rule.grow_one_literal, [(incl_or_excl, literal[0], literal[1], left, right, log) for literal in literals], chunksize=8)
+            res = pool.starmap_async(rule.grow_one_literal, [(incl_or_excl, literal[0], literal[1], results, log) for literal in literals], chunksize=8)
+            res.wait()
             pool.close()
+            # [rule.grow_one_literal(incl_or_excl, literal[0], literal[1], results, log) for literal in literals]
+
+            if self.data_info.alg_config.log_learning_process > 0 and log:
+                self.data_info.logger.info(f"Number of literals grown: {len(results)}")
 
             # print(len(left), len(right))
 
-            for left_grow_info, right_grow_info in zip(left, right):
+            for (left_grow_info, right_grow_info) in results:
                 if left_grow_info is None or right_grow_info is None:
                     continue
-                # left_grow_info["_rule"] = rule
-                # right_grow_info["_rule"] = rule
+                left_grow_info["_rule"] = rule
+                right_grow_info["_rule"] = rule
                 beam.update(left_grow_info, left_grow_info[f"normalized_gain_{incl_or_excl}"])
                 beam.update(right_grow_info, right_grow_info[f"normalized_gain_{incl_or_excl}"])
             beam_list.append(beam)

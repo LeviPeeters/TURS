@@ -220,10 +220,6 @@ class Rule:
         ---
         None
         """
-        if self.data_info.alg_config.log_learning_process > 0 and log:
-            self.data_info.growth_logger.info(f"{self.data_info.current_rule},{self.data_info.current_iteration},{self.coverage},{self.coverage_excl},{self.mdl_gain},{self.mdl_gain_excl}")
-        if self.data_info.alg_config.log_learning_process > 1 and log:    
-            self.data_info.logger.info(str(self))
         
         candidate_cuts = self.data_info.candidate_cuts
 
@@ -286,7 +282,7 @@ class Rule:
         if self.data_info.alg_config.log_learning_process > 2 and log:
             self.data_info.time_logger.info(f"0,{total_time_getting_data},getting_data")
 
-    def grow_one_literal(self, incl_or_excl, icol, cut, left, right, log=False):
+    def grow_one_literal(self, incl_or_excl, icol, cut, results, log=False):
         # Sparse: The binary array needs to be converted to dense and flattened, as sparse matrices do not reduce in dimension after slicing
         bi_array = self.data_info.features[:, [icol]].todense().flatten()
 
@@ -332,7 +328,7 @@ class Rule:
             coverage_excl=excl_right_coverage, coverage_incl=incl_right_coverage,
             normalized_gain_excl=info_theo_scores["absolute_gain_excl"] / excl_right_coverage,
             normalized_gain_incl=info_theo_scores["absolute_gain"] / excl_right_coverage, # Question: Shouldn't this be incl_coverage? 
-            _rule=self
+            _rule=0
         )
 
         # Ratio of coverage after the grow step to the coverage of the rule before the grow step
@@ -355,7 +351,7 @@ class Rule:
             coverage_excl=excl_left_coverage, coverage_incl=incl_left_coverage,
             normalized_gain_excl=info_theo_scores["absolute_gain_excl"] / excl_left_coverage,
             normalized_gain_incl=info_theo_scores["absolute_gain"] / excl_left_coverage, # Question: Shouldn't this be incl_coverage?    
-            _rule=self
+            _rule=0
         )
 
         # Ratio of coverage after the grow step to the coverage of the rule before the grow step
@@ -365,10 +361,13 @@ class Rule:
         else:
             left_grow_info[f"coverage_percentage"] = left_grow_info[f"coverage_excl"] / self.coverage_excl
 
+        s = time.time()
         # Update the beams if the grow step is valid
+        # TODO: Serializing the info objects is a major bottleneck
         if _validity[f"res_{incl_or_excl}"]:
-            left.append( left_grow_info ) 
-            right.append( right_grow_info ) 
+            results.append( (left_grow_info, right_grow_info) ) 
+        if self.data_info.alg_config.log_learning_process > 2 and log:
+            self.data_info.time_logger.info(f"0,{time.time() - s}, Put results in list")
         return None, None
             
             
