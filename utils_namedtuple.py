@@ -15,3 +15,13 @@ GrowGains = namedtuple("GrowGains", ["incl_abs_gain", "excl_abs_gain", "incl_gai
                                      "excl_gain_per_excl_cover",
                                      "cl_model", "cl_data_incl", "cl_data_excl",
                                      "incl_coverage", "excl_coverage"])
+
+RulesetInfo = namedtuple("RulesetInfo", [
+    "total_cl",
+    "n_rules",
+    "allrules_cl_model",
+    "uncovered_bool",
+    "allrules_cl_data",
+    "uncovered_indices",
+    "allrules_regret"
+])

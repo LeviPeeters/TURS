@@ -1,18 +1,14 @@
 import numpy as np
 import time
 from datetime import datetime
-from memory_profiler import profile
-import multiprocessing as mp
-import dill
-from scipy.sparse import csc_array
- 
+from functools import partial
+
+import nml_regret
 import Rule
 import Beam
 import ModellingGroup
 import DataInfo
 import utils_calculating_cl
-import ModelEncoding
-import DataEncoding
 import utils
 
 def make_rule_from_grow_info(grow_info):
@@ -84,13 +80,13 @@ def extract_rules_from_beams(beams):
 class Ruleset:
     def __init__(self,
                  data_info: DataInfo.DataInfo,
-                 data_encoding: DataEncoding.NMLencoding,
-                 model_encoding: ModelEncoding.ModelEncodingDependingOnData,
                  constraints = None):
 
         self.data_info = data_info
-        self.model_encoding = model_encoding
-        self.data_encoding = data_encoding
+        
+        self.num_class = data_info.num_class
+        self.calc_probs = partial(utils_calculating_cl.calc_probs, num_class=self.num_class)
+        self.allrules_regret = 0
 
         self.rules = []
 
@@ -98,7 +94,7 @@ class Ruleset:
         self.uncovered_bool = np.ones(self.data_info.nrow, dtype=bool)
         self.else_rule_p = utils_calculating_cl.calc_probs(target=data_info.target, num_class=data_info.num_class)
         self.else_rule_coverage = self.data_info.nrow
-        self.elserule_total_cl = self.data_encoding.get_cl_data_elserule(ruleset=self)
+        self.elserule_total_cl = self.get_cl_data_elserule()
 
         self.negloglike = -np.sum(data_info.nrow * np.log2(self.else_rule_p[self.else_rule_p != 0]) * self.else_rule_p[self.else_rule_p != 0])
         self.else_rule_negloglike = self.negloglike
@@ -118,8 +114,7 @@ class Ruleset:
             self.constraints = constraints
         
         
-
-    def add_rule(self, rule):
+    def add_rule(self, rule: Rule.Rule):
         """ Add a rule to the ruleset and update code length accordingly
         
         Parameters
@@ -132,9 +127,9 @@ class Ruleset:
         self.rules.append(rule)
         
         self.cl_data, self.allrules_cl_data = \
-            self.data_encoding.update_ruleset_and_get_cl_data_ruleset_after_adding_rule(ruleset=self, rule=rule)
+            self.update_ruleset_and_get_cl_data_ruleset_after_adding_rule(rule=rule)
         self.cl_model = \
-            self.model_encoding.cl_model_after_growing_rule(rule=rule, ruleset=self, icol=None, cut_option=None)
+            rule.cl_model_after_growing_rule(ruleset=self, icol=None, cut_option=None)
 
         # Update total codelength
         self.total_cl = self.cl_data + self.cl_model
@@ -157,6 +152,56 @@ class Ruleset:
         self.else_rule_coverage = len(self.uncovered_indices)
         self.else_rule_p = utils_calculating_cl.calc_probs(self.data_info.target[self.uncovered_indices], self.data_info.num_class)
         self.else_rule_negloglike = utils_calculating_cl.calc_negloglike(self.else_rule_p, self.else_rule_coverage)
+
+    def get_cl_data_elserule(self):
+        """ Get the code length of the data covered by the else rule
+        
+        Parameters
+        ---
+        ruleset : Ruleset object
+            Ruleset under consideration
+        Returns
+        ---
+        : float
+            Code length of the data covered by the else rule
+        """
+        p = self.calc_probs(self.data_info.target[self.uncovered_indices])
+
+        # Because of this below line of code, this function needs to be called after updating the ruleset's attributes
+        coverage = len(self.uncovered_indices)
+
+        negloglike_rule = -coverage * np.sum(np.log2(p[p != 0]) * p[p != 0])
+        reg = nml_regret.regret(coverage, self.data_info.num_class)
+        return negloglike_rule + reg
+    
+    def update_ruleset_and_get_cl_data_ruleset_after_adding_rule(self, 
+                                                                 rule: Rule.Rule):
+        """ Update the ruleset and get the code length of the data and the ruleset after adding a rule
+        Question: Why is the else rule updated here, and not in the ruleset class?
+
+        Parameters
+        ---
+        ruleset : Ruleset object
+            Ruleset to be updated
+        rule : Rule object
+            Rule to be added to the ruleset
+        Returns
+        ---
+        : list
+            A list containing the code length of the data and the ruleset after adding the rule
+        """
+        self.update_else_rule(rule)  # update Ruleset object's attributes w.r.t the information of the else-rule
+        self.elserule_total_cl = self.get_cl_data_elserule()  # else-rule's cl_data: negloglike + regret
+
+        allrules_negloglike_except_elserule = self.get_negloglike_all_modelling_groups(rule)
+        allrules_regret = np.sum([nml_regret.regret(r.coverage, self.data_info.num_class) for r in self.rules])
+
+        cl_data = self.elserule_total_cl + allrules_negloglike_except_elserule + allrules_regret
+        allrules_cl_data = allrules_negloglike_except_elserule + allrules_regret
+
+        self.allrules_regret = allrules_regret
+
+        return [cl_data, allrules_cl_data]
 
     def get_negloglike_all_modelling_groups(self, rule):
         """ Calculate the total negative log-likelihood of all rules when adding a new rule
@@ -343,7 +388,6 @@ class Ruleset:
           : Rule object
             Rule found by the beam search
         """
-
         if rule_given is None:
             rule = Rule.Rule(indices=np.arange(self.data_info.nrow), 
                         indices_excl=self.uncovered_indices,
@@ -415,56 +459,8 @@ class Ruleset:
         for rule in rules_for_next_iter:
             rule: Rule.Rule
 
-            if self.data_info.alg_config.log_learning_process > 0 and log:
-                self.data_info.growth_logger.info(f"{self.data_info.current_rule},{self.data_info.current_iteration},{rule.coverage},{rule.coverage_excl},{rule.mdl_gain},{rule.mdl_gain_excl}")
-            if self.data_info.alg_config.log_learning_process > 1 and log:    
-                self.data_info.logger.info(str(rule))
+            beam = rule.grow(incl_or_excl, log=log)
 
-            beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
-            manager = mp.Manager()
-            results = manager.list()
-            
-            candidate_cuts = self.data_info.candidate_cuts
-
-            # Make a list of all literals to be grown
-            literals = []
-            for icol in range(self.data_info.ncol):
-                candidate_cuts_icol = rule.get_candidate_cuts_icol_given_rule(candidate_cuts, icol)
-                for cut in candidate_cuts_icol:
-                    literals.append((icol, cut))
-            
-            with dill.detect.trace("dill_trace.log", mode='w'):
-                dill.dumps(rule)
-
-            manager = mp.Manager()
-
-            data = manager.Array('d', self.data_info.features.data)
-            indices = manager.Array('i', self.data_info.features.indices)
-            indptr = manager.Array('i', self.data_info.features.indptr)
-                
-            s = time.time()
-            # Create a worker pool to grow the literals in parallel
-            pool = mp.Pool(mp.cpu_count())
-
-            res = pool.starmap_async(rule.grow_one_literal, [(data, indices, indptr, incl_or_excl, literal[0], literal[1], results, log) for literal in literals], chunksize=4)
-            res.wait()
-            pool.close()
-
-            # [rule.grow_one_literal(incl_or_excl, literal[0], literal[1], results, log) for literal in literals]
-            
-            if self.data_info.alg_config.log_learning_process > 2 and log:
-                self.data_info.time_logger.info(f"0,{time.time() - s},grow_one_literal with overhead")
-
-            if self.data_info.alg_config.log_learning_process > 0 and log:
-                self.data_info.logger.info(f"Number of literals grown: {len(results)}")
-
-            for (left_grow_info, right_grow_info) in results:
-                if left_grow_info is None or right_grow_info is None:
-                    continue
-                left_grow_info["_rule"] = rule
-                right_grow_info["_rule"] = rule
-                beam.update(left_grow_info, left_grow_info[f"normalized_gain_{incl_or_excl}"])
-                beam.update(right_grow_info, right_grow_info[f"normalized_gain_{incl_or_excl}"])
             beam_list.append(beam)
  
         # Combine the beams and make GrowInfoBeam objects to store them
