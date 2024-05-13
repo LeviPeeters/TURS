@@ -1,6 +1,9 @@
 # API
 
 from datetime import datetime
+import multiprocessing as mp
+from multiprocessing.managers import BaseManager, NamespaceProxy
+import inspect
 
 import DataInfo
 import Ruleset
@@ -8,6 +11,26 @@ import ModelEncoding
 import DataEncoding
 import utils_namedtuple
 import utils
+
+"""
+class MyManager(BaseManager): pass
+
+class ProxyBase(NamespaceProxy):
+    _exposed_ = ('__getattribute__', '__setattr__', '__delattr__')
+
+class DataInfoProxy(ProxyBase): pass
+
+
+def register_proxy(name, cls, proxy):
+    for attr in dir(cls):
+        if inspect.ismethod(getattr(cls, attr)) and not attr.startswith("__"):
+            proxy._exposed_ += (attr,)
+            setattr(proxy, attr, 
+                    lambda s: object.__getattribute__(s, '_callmethod')(attr))
+    MyManager.register(name, cls, proxy)
+
+register_proxy('DataInfo', DataInfo.DataInfo, DataInfoProxy)"""
+
 
 class TURS():
     def __init__(self,
@@ -65,8 +88,13 @@ class TURS():
         ]
 
     def fit(self, X_train, y_train):
-        data_info = DataInfo.DataInfo(X=X_train, y=y_train, beam_width=None, alg_config=self.alg_config)
 
+        # manager = MyManager()
+        # manager.start()
+
+        # data_info = manager.DataInfo(X=X_train, y=y_train, beam_width=None, alg_config=self.alg_config)
+
+        data_info = DataInfo.DataInfo(X=X_train, y=y_train, beam_width=None, alg_config=self.alg_config)
         data_encoding = DataEncoding.NMLencoding(data_info)
         model_encoding = ModelEncoding.ModelEncodingDependingOnData(data_info)
 

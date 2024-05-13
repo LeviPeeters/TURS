@@ -1,6 +1,7 @@
 import numpy as np
 import math
 import time
+from scipy.sparse import csc_array
 
 import utils_modelencoding
 import DataInfo
@@ -97,7 +98,7 @@ class ModelEncodingDependingOnData:
 
         return l_num_variables + l_which_variables + l_cuts
     
-    def rule_cl_model_dep(self, condition_matrix, col_orders, log=False):
+    def rule_cl_model_dep(self, data, indices, indptr, condition_matrix, col_orders, log=False):
         """ Calculate the code length of a rule depending on data.
         Encodes the features one by one, discarding cutting points that become irrelevant as literals are "transmitted".
         Assumes that we can use the data to encode the model, i.e. the model is not needed to decode the data. 
@@ -114,70 +115,75 @@ class ModelEncodingDependingOnData:
         : float
             Code length of the rule
         """
-        if self.data_info.log_learning_process > 2 and log:
-            s = time.time()
-        # Count the conditions on each feature. Can be 0, 1 or 2. 
-        condition_count = (~np.isnan(condition_matrix[0])).astype(int) + (~np.isnan(condition_matrix[1])).astype(int)
-
-        num_variables = np.count_nonzero(condition_count)
-        l_num_variables = self.cached_cl_model["l_number_of_variables"][num_variables]
-        l_which_variables = self.cached_cl_model["l_which_variables"][num_variables]
-
-        bool_ = np.ones(self.data_info.features.shape[0], dtype=bool)
-
-        covered_features = self.data_info.features[bool_, :]
-
-        l_cuts = 0
-
-        if self.data_info.log_learning_process > 2 and log:
-            self.data_info.time_logger.info(f"0,{time.time() - s},CL model -> before loop")
-
-        for index, col in enumerate(col_orders):
-            s = time.time()
-            feature = covered_features[:, [col]]
-            up_bound, low_bound = np.max(feature), np.min(feature)
+        try:
             if self.data_info.log_learning_process > 2 and log:
-                self.data_info.time_logger.info(f"0,{time.time() - s},CL model -> calculate bounds")
+                s = time.time()
+            # Count the conditions on each feature. Can be 0, 1 or 2. 
+            condition_count = (~np.isnan(condition_matrix[0])).astype(int) + (~np.isnan(condition_matrix[1])).astype(int)
 
-            s = time.time()
-            num_cuts = np.count_nonzero((self.data_info.candidate_cuts[col] >= low_bound) &
-                                        (self.data_info.candidate_cuts[col] <= up_bound))  # only an approximation here.
+            num_variables = np.count_nonzero(condition_count)
+            l_num_variables = self.cached_cl_model["l_number_of_variables"][num_variables]
+            l_which_variables = self.cached_cl_model["l_which_variables"][num_variables]
 
-            # Code lenth required to encode the cutting point(s)
-            if condition_count[col] == 1:
-                if num_cuts == 0:
-                    l_cuts += 0
-                else:
-                    l_cuts += np.log2(num_cuts)
-            else:
-                if num_cuts >= 2:
-                    l_cuts += np.log2(num_cuts) + np.log2(num_cuts - 1) - np.log2(2)
-                else:
-                    l_cuts += 0
+            features = csc_array((data, indices, indptr), shape=(self.data_info.nrow, self.data_info.ncol))
+
+            bool_ = np.ones(features.shape[0], dtype=bool)
+            covered_features = features#[bool_, :]
+
+            l_cuts = 0
 
             if self.data_info.log_learning_process > 2 and log:
-                self.data_info.time_logger.info(f"0,{time.time() - s},CL model -> misc")
+                self.data_info.time_logger.info(f"0,{time.time() - s},CL model -> before loop")
 
-            s = time.time()
-            # Now that we have "transmitted" a literal, we can drop data that the rule no longer covers
-            # This make the code length of the next literal smaller, as some cutting points might not be relevant anymore
-            if index != len(col_orders) - 1:
-                assert condition_count[col] == 1 or condition_count[col] == 2
+            for index, col in enumerate(col_orders):
+                s = time.time()
+                feature = covered_features[:, [col]]
+                up_bound, low_bound = np.max(feature), np.min(feature)
+                if self.data_info.log_learning_process > 2 and log:
+                    self.data_info.time_logger.info(f"0,{time.time() - s},CL model -> calculate bounds")
+
+                s = time.time()
+                num_cuts = np.count_nonzero((self.data_info.candidate_cuts[col] >= low_bound) &
+                                            (self.data_info.candidate_cuts[col] <= up_bound))  # only an approximation here.
+
+                # Code lenth required to encode the cutting point(s)
                 if condition_count[col] == 1:
-                    if not np.isnan(condition_matrix[0, col]):
-                        bool_ = bool_ & (self.data_info.features[:, [col]].todense().flatten() <= condition_matrix[0, col])
+                    if num_cuts == 0:
+                        l_cuts += 0
                     else:
-                        bool_ = bool_ & (self.data_info.features[:, [col]].todense().flatten() > condition_matrix[1, col])
+                        l_cuts += np.log2(num_cuts)
                 else:
-                    temp = self.data_info.features[:, [col]].todense().flatten()
-                    bool_ = bool_ & ((temp <= condition_matrix[0, col]) &
-                                     (temp > condition_matrix[1, col]))
-            if self.data_info.log_learning_process > 2 and log:
-                self.data_info.time_logger.info(f"0,{time.time() - s}, CL model-> drop uncovered data")
+                    if num_cuts >= 2:
+                        l_cuts += np.log2(num_cuts) + np.log2(num_cuts - 1) - np.log2(2)
+                    else:
+                        l_cuts += 0
 
-        return l_num_variables + l_which_variables + l_cuts
+                if self.data_info.log_learning_process > 2 and log:
+                    self.data_info.time_logger.info(f"0,{time.time() - s},CL model -> misc")
 
-    def cl_model_after_growing_rule(self, rule, ruleset, icol, cut_option, log=False):
+                s = time.time()
+                # Now that we have "transmitted" a literal, we can drop data that the rule no longer covers
+                # This make the code length of the next literal smaller, as some cutting points might not be relevant anymore
+                if index != len(col_orders) - 1:
+                    assert condition_count[col] == 1 or condition_count[col] == 2
+                    if condition_count[col] == 1:
+                        if not np.isnan(condition_matrix[0, col]):
+                            bool_ = bool_ & (features[:, [col]].todense().flatten() <= condition_matrix[0, col])
+                        else:
+                            bool_ = bool_ & (features[:, [col]].todense().flatten() > condition_matrix[1, col])
+                    else:
+                        temp = features[:, [col]].todense().flatten()
+                        bool_ = bool_ & ((temp <= condition_matrix[0, col]) &
+                                        (temp > condition_matrix[1, col]))
+                if self.data_info.log_learning_process > 2 and log:
+                    self.data_info.time_logger.info(f"0,{time.time() - s}, CL model-> drop uncovered data")
+
+            return l_num_variables + l_which_variables + l_cuts
+        except:
+            self.data_info.logger.error("Error in rule_cl_model_dep")
+            raise
+
+    def cl_model_after_growing_rule(self, data, indices, indptr, rule, ruleset, icol, cut_option, log=False):
         """ Calculate model code length after growing on a rule.
         If icol and cut_option are not None, the rule is still being grown.
         
@@ -197,35 +203,38 @@ class ModelEncodingDependingOnData:
         : float
             Code length of the ruleset after growing on the rule
         """
-        
-        # This should never happen, but TURS2 has code to catch this occurence so I'll check for it
-        assert rule is not None, "Rule is None when computing model code length after growing"
+        try:
+            # This should never happen, but TURS2 has code to catch this occurence so I'll check for it
+            assert rule is not None, "Rule is None when computing model code length after growing"
 
-        condition_count = np.array(rule.condition_bool)
-        icols_in_order = rule.icols_in_order
-        condition_matrix = np.array(rule.condition_matrix)
+            condition_count = np.array(rule.condition_bool)
+            icols_in_order = rule.icols_in_order
+            condition_matrix = np.array(rule.condition_matrix)
 
-        growing_rule = 0
+            growing_rule = 0
 
-        # when the rule is still being grown by adding condition using icol, we need to update the condition_count;
-        if icol is not None and cut_option is not None:
-            if np.isnan(rule.condition_matrix[cut_option, icol]):
-                condition_count[icol] += 1
-                # Note that this is just a place holder, to make this position not equal to np.nan; Need to make this more readable later.
-                condition_matrix[0, icol] = np.inf
+            # when the rule is still being grown by adding condition using icol, we need to update the condition_count;
+            if icol is not None and cut_option is not None:
+                if np.isnan(rule.condition_matrix[cut_option, icol]):
+                    condition_count[icol] += 1
+                    # Note that this is just a place holder, to make this position not equal to np.nan; Need to make this more readable later.
+                    condition_matrix[0, icol] = np.inf
 
-            if icol not in icols_in_order:
-                icols_in_order = icols_in_order + [icol]
+                if icol not in icols_in_order:
+                    icols_in_order = icols_in_order + [icol]
+                
+                growing_rule = 1
+
+            # note that here is a choice based on the assumption that we can use $X$ to encode the model;
+            cl_model_rule_after_growing = self.rule_cl_model_dep(data, indices, indptr, condition_matrix, icols_in_order, log=log)
+
+            # If we are growing a rule, this rule is not in the ruleset yet so we add 1 
+            l_num_rules = utils_modelencoding.universal_code_integers(len(ruleset.rules) + growing_rule)
             
-            growing_rule = 1
+            # Cover redunancy in the order of rules
+            cl_redundancy_rule_orders = math.lgamma(len(ruleset.rules) + 1 + growing_rule) / np.log(2)
 
-        # note that here is a choice based on the assumption that we can use $X$ to encode the model;
-        cl_model_rule_after_growing = self.rule_cl_model_dep(condition_matrix, icols_in_order, log=log)
-
-        # If we are growing a rule, this rule is not in the ruleset yet so we add 1 
-        l_num_rules = utils_modelencoding.universal_code_integers(len(ruleset.rules) + growing_rule)
-        
-        # Cover redunancy in the order of rules
-        cl_redundancy_rule_orders = math.lgamma(len(ruleset.rules) + 1 + growing_rule) / np.log(2)
-
-        return l_num_rules + cl_model_rule_after_growing - cl_redundancy_rule_orders + ruleset.allrules_cl_model
+            return l_num_rules + cl_model_rule_after_growing - cl_redundancy_rule_orders + ruleset.allrules_cl_model
+        except:
+            self.data_info.logger.error("Error in cl_model_after_growing_rule")
+            raise

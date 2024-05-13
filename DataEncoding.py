@@ -103,21 +103,25 @@ class NMLencoding(DataEncoding):
         : float
             Code length of the data when this rule is added to the ruleset
         """
-        p_rule = self.calc_probs(rule.target_excl[bool])
-        coverage_rule = np.count_nonzero(bool)
-        negloglike_rule = -coverage_rule * np.sum(np.log2(p_rule[p_rule != 0]) * p_rule[p_rule != 0])
+        try:
+            p_rule = self.calc_probs(rule.target_excl[bool])
+            coverage_rule = np.count_nonzero(bool)
+            negloglike_rule = -coverage_rule * np.sum(np.log2(p_rule[p_rule != 0]) * p_rule[p_rule != 0])
 
-        else_bool = np.array(ruleset.uncovered_bool)
-        else_bool[rule.indices_excl[bool]] = False
-        coverage_else = np.count_nonzero(else_bool)
-        p_else = utils_calculating_cl.calc_probs(self.data_info.target[else_bool], self.data_info.num_class)
-        negloglike_else = -coverage_else * np.sum(np.log2(p_else[p_else != 0]) * p_else[p_else != 0])
+            else_bool = np.array(ruleset.uncovered_bool)
+            else_bool[rule.indices_excl[bool]] = False
+            coverage_else = np.count_nonzero(else_bool)
+            p_else = utils_calculating_cl.calc_probs(self.data_info.target[else_bool], self.data_info.num_class)
+            negloglike_else = -coverage_else * np.sum(np.log2(p_else[p_else != 0]) * p_else[p_else != 0])
 
-        regret_else, regret_rule = nml_regret.regret(coverage_else, self.num_class), nml_regret.regret(coverage_rule, self.num_class)
+            regret_else, regret_rule = nml_regret.regret(coverage_else, self.num_class), nml_regret.regret(coverage_rule, self.num_class)
 
-        cl_data = negloglike_else + regret_else + negloglike_rule + regret_rule + ruleset.allrules_cl_data
+            cl_data = negloglike_else + regret_else + negloglike_rule + regret_rule + ruleset.allrules_cl_data
 
-        return cl_data
+            return cl_data
+        except:
+            self.data_info.logger.error("Error in rule_cl_model_dep")
+            raise
 
     def get_cl_data_incl(self, ruleset, rule, excl_bi_array, incl_bi_array):
         """ Get the code length of the data if rule is added to ruleset.
@@ -139,32 +143,36 @@ class NMLencoding(DataEncoding):
         : float
             Code length of the data when this rule is added to the ruleset
         """
-        excl_coverage, incl_coverage = np.count_nonzero(excl_bi_array), np.count_nonzero(incl_bi_array)
+        try:
+            excl_coverage, incl_coverage = np.count_nonzero(excl_bi_array), np.count_nonzero(incl_bi_array)
 
-        p_excl = self.calc_probs(rule.target_excl[excl_bi_array])
-        p_incl = self.calc_probs(rule.target[incl_bi_array])
+            p_excl = self.calc_probs(rule.target_excl[excl_bi_array])
+            p_incl = self.calc_probs(rule.target[incl_bi_array])
 
-        modelling_groups = ruleset.modelling_groups
-        both_negloglike = np.zeros(len(modelling_groups),
-                                   dtype=float)  # "both" in the name is to emphasize that this is the overlap of both the rule and a modelling_group
-        for i, modelling_group in enumerate(modelling_groups):
-            # Note: both_negloglike[i] represents negloglike(modelling_group \setdiff rule) + negloglike(modelling_Group \and rule) # noqa
-            both_negloglike[i] = modelling_group.evaluate_rule_with_no_updating(indices=rule.indices[incl_bi_array])
+            modelling_groups = ruleset.modelling_groups
+            both_negloglike = np.zeros(len(modelling_groups),
+                                    dtype=float)  # "both" in the name is to emphasize that this is the overlap of both the rule and a modelling_group
+            for i, modelling_group in enumerate(modelling_groups):
+                # Note: both_negloglike[i] represents negloglike(modelling_group \setdiff rule) + negloglike(modelling_Group \and rule) # noqa
+                both_negloglike[i] = modelling_group.evaluate_rule_with_no_updating(indices=rule.indices[incl_bi_array])
 
-        # the non-overlapping part for the rule
-        non_overlapping_negloglike = -excl_coverage * np.sum(p_excl[p_incl != 0] * np.log2(p_incl[p_incl != 0]))
-        rule_regret = nml_regret.regret(incl_coverage, self.num_class)
+            # the non-overlapping part for the rule
+            non_overlapping_negloglike = -excl_coverage * np.sum(p_excl[p_incl != 0] * np.log2(p_incl[p_incl != 0]))
+            rule_regret = nml_regret.regret(incl_coverage, self.num_class)
 
-        new_else_bool = np.zeros(self.data_info.nrow, dtype=bool)
-        new_else_bool[ruleset.uncovered_indices] = True
-        new_else_bool[rule.indices_excl[excl_bi_array]] = False
-        new_else_coverage = np.count_nonzero(new_else_bool)
-        new_else_p = self.calc_probs(self.data_info.target[new_else_bool])
+            new_else_bool = np.zeros(self.data_info.nrow, dtype=bool)
+            new_else_bool[ruleset.uncovered_indices] = True
+            new_else_bool[rule.indices_excl[excl_bi_array]] = False
+            new_else_coverage = np.count_nonzero(new_else_bool)
+            new_else_p = self.calc_probs(self.data_info.target[new_else_bool])
 
-        new_else_negloglike = self.calc_negloglike(p=new_else_p, n=new_else_coverage)
-        new_else_regret = nml_regret.regret(new_else_coverage, self.data_info.num_class)
+            new_else_negloglike = self.calc_negloglike(p=new_else_p, n=new_else_coverage)
+            new_else_regret = nml_regret.regret(new_else_coverage, self.data_info.num_class)
 
-        cl_data = (new_else_negloglike + new_else_regret) + (np.sum(both_negloglike) + self.allrules_regret) + \
-                  (non_overlapping_negloglike + rule_regret)
+            cl_data = (new_else_negloglike + new_else_regret) + (np.sum(both_negloglike) + self.allrules_regret) + \
+                    (non_overlapping_negloglike + rule_regret)
 
-        return cl_data
+            return cl_data
+        except:
+            self.data_info.logger.error("Error in rule_cl_model_dep")
+            raise

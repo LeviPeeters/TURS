@@ -4,7 +4,8 @@ from datetime import datetime
 from memory_profiler import profile
 import multiprocessing as mp
 import dill
-
+from scipy.sparse import csc_array
+ 
 import Rule
 import Beam
 import ModellingGroup
@@ -431,19 +432,31 @@ class Ruleset:
                 candidate_cuts_icol = rule.get_candidate_cuts_icol_given_rule(candidate_cuts, icol)
                 for cut in candidate_cuts_icol:
                     literals.append((icol, cut))
+            
+            with dill.detect.trace("dill_trace.log", mode='w'):
+                dill.dumps(rule)
 
+            manager = mp.Manager()
+
+            data = manager.Array('d', self.data_info.features.data)
+            indices = manager.Array('i', self.data_info.features.indices)
+            indptr = manager.Array('i', self.data_info.features.indptr)
+                
+            s = time.time()
             # Create a worker pool to grow the literals in parallel
             pool = mp.Pool(mp.cpu_count())
 
-            res = pool.starmap_async(rule.grow_one_literal, [(incl_or_excl, literal[0], literal[1], results, log) for literal in literals], chunksize=8)
+            res = pool.starmap_async(rule.grow_one_literal, [(data, indices, indptr, incl_or_excl, literal[0], literal[1], results, log) for literal in literals], chunksize=4)
             res.wait()
             pool.close()
+
             # [rule.grow_one_literal(incl_or_excl, literal[0], literal[1], results, log) for literal in literals]
+            
+            if self.data_info.alg_config.log_learning_process > 2 and log:
+                self.data_info.time_logger.info(f"0,{time.time() - s},grow_one_literal with overhead")
 
             if self.data_info.alg_config.log_learning_process > 0 and log:
                 self.data_info.logger.info(f"Number of literals grown: {len(results)}")
-
-            # print(len(left), len(right))
 
             for (left_grow_info, right_grow_info) in results:
                 if left_grow_info is None or right_grow_info is None:

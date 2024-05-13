@@ -2,26 +2,31 @@ import numpy as np
 import sys
 import dill
 import weakref
+import logging
 
 import utils_calculating_cl
 import nml_regret
 import Beam
 import DataInfo
 import time
-
+from scipy.sparse import csc_array
 
 import constant
 
 def store_grow_info(excl_bi_array, incl_bi_array, icol, cut, cut_option, excl_mdl_gain, incl_mdl_gain,
-                    coverage_excl, coverage_incl, normalized_gain_excl, normalized_gain_incl, _rule):
+                    coverage_excl, coverage_incl, normalized_gain_excl, normalized_gain_incl):
     """ Store the information of a grow step in a dictionary."""
+    try:
+        excl_coverage = np.count_nonzero(excl_bi_array)
+        incl_coverage = np.count_nonzero(incl_bi_array)
+        
+        # locals() returns a dictionary containing all local variables
+        return locals()
     
-    excl_coverage = np.count_nonzero(excl_bi_array)
-    incl_coverage = np.count_nonzero(incl_bi_array)
+    except:
+        logging.error("Error in store_grow_info")
+        raise
     
-    # locals() returns a dictionary containing all local variables
-    return locals()
-
 def store_grow_info_rulelist(excl_bi_array, icol, cut, cut_option, excl_normalized_gain):
     return {"excl_bi_array": excl_bi_array, "icol": icol, "cut": cut,
             "cut_option": cut_option, "excl_normalized_gain": excl_normalized_gain}
@@ -56,8 +61,8 @@ class Rule:
         self.coverage_excl = len(self.indices_excl)
 
         # The feature arrays take up far too much memory, especially because empty rules cover the entire dataset\
-        self.target = self.data_info.target[indices]
-        self.target_excl = self.data_info.target[indices_excl]
+        self.target = data_info.target[indices]
+        self.target_excl = data_info.target[indices_excl]
 
         # Condition matrix containing the rule literals and a boolean array to show which features have a condition
         self.condition_matrix = condition_matrix
@@ -69,7 +74,7 @@ class Rule:
         self.regret_excl = nml_regret.regret(len(self.indices_excl), data_info.num_class)
         self.regret = nml_regret.regret(len(self.indices), data_info.num_class)
         self.negloglike_excl = utils_calculating_cl.calc_negloglike(p=self.prob_excl, n=len(self.indices_excl))
-        self.cl_model = self.ruleset.model_encoding.rule_cl_model_dep(self.condition_matrix, col_orders=icols_in_order)
+        self.cl_model = self.ruleset.model_encoding.rule_cl_model_dep(self.data_info.features.data, self.data_info.features.indices, self.data_info.features.indptr, self.condition_matrix, col_orders=icols_in_order)
 
         self.mdl_gain = mdl_gain
         self.mdl_gain_excl = mdl_gain_excl
@@ -130,250 +135,112 @@ class Rule:
         candidate_cuts_icol : Array
             List of candidate cuts for the feature 
         """
+        features = self.data_info.features
         if self.rule_base is None:
-            candidate_cuts_selector = (candidate_cuts[icol] < np.max(self.data_info.features[self.indices_excl, [icol]].flatten())) & \
-                                      (candidate_cuts[icol] > np.min(self.data_info.features[self.indices_excl, [icol]].flatten()))
+            candidate_cuts_selector = (candidate_cuts[icol] < np.max(features[self.indices_excl, [icol]].flatten())) & \
+                                      (candidate_cuts[icol] > np.min(features[self.indices_excl, [icol]].flatten()))
             candidate_cuts_icol = candidate_cuts[icol][candidate_cuts_selector]
         else:
-            candidate_cuts_selector = (candidate_cuts[icol] < np.max(self.data_info.features[self.indices, [icol]])) & \
-                                      (candidate_cuts[icol] > np.min(self.data_info.features[self.indices, [icol]]))
+            candidate_cuts_selector = (candidate_cuts[icol] < np.max(features[self.indices, [icol]])) & \
+                                      (candidate_cuts[icol] > np.min(features[self.indices, [icol]]))
             candidate_cuts_icol = candidate_cuts[icol][candidate_cuts_selector]
         return candidate_cuts_icol
 
-    def update_grow_beam(self, bi_array, excl_bi_array, icol, cut, cut_option, incl_coverage, excl_coverage,
-                         grow_info_beam: Beam.GrowInfoBeam, incl_or_excl, _validity, log=False):
-        """ Use information of a grow step to update the beam.
+    def grow_one_literal(self, data, indices, indptr, incl_or_excl, icol, cut, results, log=False):
+        try:
+            s_tot  = time.time()
+            # bi_array = self.data_info.features[:, [icol]].todense().flatten()
+            bi_array = csc_array((data, indices, indptr), shape=(self.data_info.nrow, self.data_info.ncol))[:, [icol]].todense().flatten()
 
-        Parameters
-        ---
-        bi_array : Array
-            Binary array containing the instances covered by the rule, including the instances covered by previous rules
-        excl_bi_array : Array
-            Binary array containing the instances covered by the rule, excluding the instances covered by previous rules
-        icol : int
-            Index of the feature for which the cut is being considered
-        cut : float
-            Cut value for the feature
-        cut_option : int
-            Which type of cut is being considered (LEFT, RIGHT, WITHIN)
-        incl_coverage : int
-            Number of instances covered by the rule, including the instances covered by previous rules
-        excl_coverage : int
-            Number of instances covered by the rule, excluding the instances covered by previous rules
-        grow_info_beam : GrowInfoBeam object
-            Beam of rules with previously covered instances
-        grow_info_beam_excl : GrowInfoBeam object
-            Beam of rules without previously covered instances
-        _validity : dict
-            Results of validity checks for the rule
-        log : bool
-            Whether to log to a csv file
+            # Construct binary arrays indicating which features fall on each side of the cut
+            excl_left_bi_array = (bi_array[self.indices_excl] < cut)
+            excl_right_bi_array = ~excl_left_bi_array
+            left_bi_array = (bi_array[self.indices] < cut)
+            right_bi_array = ~left_bi_array
 
-        Returns
-        ---
-        None
-        """
+            # Store all of the binary arrays in a dictionary to make them easy to pass to validity check
+            bi_arrays = {"left": left_bi_array, 
+                            "right": right_bi_array, 
+                            "excl_left": excl_left_bi_array,
+                            "excl_right": excl_right_bi_array}
 
-        s = time.time()
-        # Calculate the MDL gain
-        info_theo_scores = self.calculate_mdl_gain(bi_array=bi_array, excl_bi_array=excl_bi_array,
-                                                   icol=icol, cut_option=cut_option, log=log)
-        
-        if self.data_info.alg_config.log_learning_process > 2 and log:
-            self.data_info.time_logger.info(f"0,{time.time() - s}, MDL gain ")
+            # Check validity and skip if not valid
+            _validity = self.validity_check(icol=icol, cut=cut, bi_arrays=bi_arrays)
 
-        # Store info in a dictionary
-        grow_info = store_grow_info(
-            excl_bi_array=excl_bi_array, incl_bi_array=bi_array, icol=icol,
-            cut=cut, cut_option=cut_option, incl_mdl_gain=info_theo_scores["absolute_gain"],
-            excl_mdl_gain=info_theo_scores["absolute_gain_excl"],
-            coverage_excl=excl_coverage, coverage_incl=incl_coverage,
-            normalized_gain_excl=info_theo_scores["absolute_gain_excl"] / excl_coverage,
-            normalized_gain_incl=info_theo_scores["absolute_gain"] / excl_coverage, # Question: Shouldn't this be incl_coverage?    
-            _rule=self
-        )
+            if self.data_info.not_use_excl_:
+                _validity["res_excl"] = False
 
-        # Ratio of coverage after the grow step to the coverage of the rule before the grow step
-        # This is the gain of the grow step
-        if incl_or_excl == "incl":
-            cov_percent = grow_info[f"coverage_incl"] / self.coverage
-        else:
-            cov_percent = grow_info[f"coverage_excl"] / self.coverage_excl
+            if _validity["res_excl"] == False and _validity["res_incl"] == False:
+                return 
 
-        # Update the beams if the grow step is valid
-        # Be careful when multithreading here! Two threads should not update the beam at the same time
-        if _validity[f"res_{incl_or_excl}"]:
-            grow_info_beam.update(grow_info, grow_info[f"normalized_gain_{incl_or_excl}"], cov_percent)
-        
+            incl_left_coverage, incl_right_coverage = np.count_nonzero(left_bi_array), np.count_nonzero(
+                right_bi_array)
+            excl_left_coverage, excl_right_coverage = np.count_nonzero(excl_left_bi_array), np.count_nonzero(
+                excl_right_bi_array)
 
-    def grow(self, grow_info_beam, incl_or_excl, log=False):
-        """ Grow the rule by one step and update the 
-        
-        Parameters
-        ---
-        grow_info_beam : DiverseCovBeam object
-            Beam object to store information for this grow step
-        grow_info_beam_excl : DiverseCovBeam object
-            Beam of object to store information for this grow step without considering previously covered instances
+            # Question: Why is there no check on incl_coverage being 0?
+            if excl_left_coverage == 0 or excl_right_coverage == 0:
+                return 
+
+            # Calculate the MDL gain
+            info_theo_scores = self.calculate_mdl_gain(data, indices, indptr, bi_array=right_bi_array, excl_bi_array=excl_right_bi_array,
+                                                    icol=icol, cut_option=constant.RIGHT_CUT, log=log)
+
+            # Store info in a dictionary
+            right_grow_info = store_grow_info(
+                excl_bi_array=excl_right_bi_array, incl_bi_array=right_bi_array, icol=icol,
+                cut=cut, cut_option=constant.RIGHT_CUT, incl_mdl_gain=info_theo_scores["absolute_gain"],
+                excl_mdl_gain=info_theo_scores["absolute_gain_excl"],
+                coverage_excl=excl_right_coverage, coverage_incl=incl_right_coverage,
+                normalized_gain_excl=info_theo_scores["absolute_gain_excl"] / excl_right_coverage,
+                normalized_gain_incl=info_theo_scores["absolute_gain"] / excl_right_coverage # Question: Shouldn't this be incl_coverage? 
+            )
+
+            # Ratio of coverage after the grow step to the coverage of the rule before the grow step
+            # This is the gain of the grow step
+            if incl_or_excl == "incl":
+                right_grow_info[f"coverage_percentage"] = right_grow_info[f"coverage_incl"] / self.coverage
+            else:
+                right_grow_info[f"coverage_percentage"] = right_grow_info[f"coverage_excl"] / self.coverage_excl                
+
             
-        Returns
-        ---
-        None
-        """
-        
-        candidate_cuts = self.data_info.candidate_cuts
+            # Calculate the MDL gain
+            info_theo_scores = self.calculate_mdl_gain(data, indices, indptr, bi_array=left_bi_array, excl_bi_array=excl_left_bi_array,
+                                                    icol=icol, cut_option=constant.LEFT_CUT, log=log)
 
-        total_time_getting_data = 0
+            # Store info in a dictionary
+            left_grow_info = store_grow_info(
+                excl_bi_array=excl_left_bi_array, incl_bi_array=left_bi_array, icol=icol,
+                cut=cut, cut_option=constant.LEFT_CUT, incl_mdl_gain=info_theo_scores["absolute_gain"],
+                excl_mdl_gain=info_theo_scores["absolute_gain_excl"],
+                coverage_excl=excl_left_coverage, coverage_incl=incl_left_coverage,
+                normalized_gain_excl=info_theo_scores["absolute_gain_excl"] / excl_left_coverage,
+                normalized_gain_incl=info_theo_scores["absolute_gain"] / excl_left_coverage # Question: Shouldn't this be incl_coverage?    
+            )
 
-        # Consider each feature
-        for icol in range(self.data_info.ncol):
-            candidate_cuts_icol = self.get_candidate_cuts_icol_given_rule(candidate_cuts, icol)
+            # Ratio of coverage after the grow step to the coverage of the rule before the grow step
+            # This is the gain of the grow step
+            if incl_or_excl == "incl":
+                left_grow_info[f"coverage_percentage"] = left_grow_info[f"coverage_incl"] / self.coverage
+            else:
+                left_grow_info[f"coverage_percentage"] = left_grow_info[f"coverage_excl"] / self.coverage_excl
 
             s = time.time()
-            # Sparse: The binary array needs to be converted to dense and flattened, as sparse matrices do not reduce in dimension after slicing
-            bi_array = self.data_info.features[:, [icol]].todense().flatten()
-            total_time_getting_data += time.time() - s
-
-            # Consider every candidate cut point
-            for i, cut in enumerate(candidate_cuts_icol):
-                # Construct binary arrays indicating which features fall on each side of the cut
-                excl_left_bi_array = (bi_array[self.indices_excl] < cut)
-                excl_right_bi_array = ~excl_left_bi_array
-                left_bi_array = (bi_array[self.indices] < cut)
-                right_bi_array = ~left_bi_array
-
-                # Store all of the binary arrays in a dictionary to make them easy to pass to validity check
-                bi_arrays = {"left": left_bi_array, 
-                             "right": right_bi_array, 
-                             "excl_left": excl_left_bi_array,
-                             "excl_right": excl_right_bi_array}
-
-                # Check validity and skip if not valid
-                _validity = self.validity_check(icol=icol, cut=cut, bi_arrays=bi_arrays)
-
-                if self.data_info.not_use_excl_:
-                    _validity["res_excl"] = False
-
-                if _validity["res_excl"] == False and _validity["res_incl"] == False:
-                    continue
-
-                incl_left_coverage, incl_right_coverage = np.count_nonzero(left_bi_array), np.count_nonzero(
-                    right_bi_array)
-                excl_left_coverage, excl_right_coverage = np.count_nonzero(excl_left_bi_array), np.count_nonzero(
-                    excl_right_bi_array)
-
-                # Question: Why is there no check on incl_coverage being 0?
-                if excl_left_coverage == 0 or excl_right_coverage == 0:
-                    continue
-                
-                # Update the beam with the results. We do this twice, because a cut can be < or >
-                self.update_grow_beam(bi_array=left_bi_array, excl_bi_array=excl_left_bi_array, icol=icol,
-                                      cut=cut, cut_option=constant.LEFT_CUT,
-                                      incl_coverage=incl_left_coverage, excl_coverage=excl_left_coverage,
-                                      grow_info_beam=grow_info_beam, incl_or_excl=incl_or_excl,
-                                      _validity=_validity, log=log)
-
-                self.update_grow_beam(bi_array=right_bi_array, excl_bi_array=excl_right_bi_array, icol=icol,
-                                      cut=cut, cut_option=constant.RIGHT_CUT,
-                                      incl_coverage=incl_right_coverage, excl_coverage=excl_right_coverage,
-                                      grow_info_beam=grow_info_beam, incl_or_excl=incl_or_excl,
-                                      _validity=_validity, log=log)
-
-        if self.data_info.alg_config.log_learning_process > 2 and log:
-            self.data_info.time_logger.info(f"0,{total_time_getting_data},getting_data")
-
-    def grow_one_literal(self, incl_or_excl, icol, cut, results, log=False):
-        # Sparse: The binary array needs to be converted to dense and flattened, as sparse matrices do not reduce in dimension after slicing
-        bi_array = self.data_info.features[:, [icol]].todense().flatten()
-
-        # Construct binary arrays indicating which features fall on each side of the cut
-        excl_left_bi_array = (bi_array[self.indices_excl] < cut)
-        excl_right_bi_array = ~excl_left_bi_array
-        left_bi_array = (bi_array[self.indices] < cut)
-        right_bi_array = ~left_bi_array
-
-        # Store all of the binary arrays in a dictionary to make them easy to pass to validity check
-        bi_arrays = {"left": left_bi_array, 
-                        "right": right_bi_array, 
-                        "excl_left": excl_left_bi_array,
-                        "excl_right": excl_right_bi_array}
-
-        # Check validity and skip if not valid
-        _validity = self.validity_check(icol=icol, cut=cut, bi_arrays=bi_arrays)
-
-        if self.data_info.not_use_excl_:
-            _validity["res_excl"] = False
-
-        if _validity["res_excl"] == False and _validity["res_incl"] == False:
-            return 
-
-        incl_left_coverage, incl_right_coverage = np.count_nonzero(left_bi_array), np.count_nonzero(
-            right_bi_array)
-        excl_left_coverage, excl_right_coverage = np.count_nonzero(excl_left_bi_array), np.count_nonzero(
-            excl_right_bi_array)
-
-        # Question: Why is there no check on incl_coverage being 0?
-        if excl_left_coverage == 0 or excl_right_coverage == 0:
-            return 
-
-        # Calculate the MDL gain
-        info_theo_scores = self.calculate_mdl_gain(bi_array=right_bi_array, excl_bi_array=excl_right_bi_array,
-                                                icol=icol, cut_option=constant.RIGHT_CUT, log=log)
-
-        # Store info in a dictionary
-        right_grow_info = store_grow_info(
-            excl_bi_array=excl_right_bi_array, incl_bi_array=right_bi_array, icol=icol,
-            cut=cut, cut_option=constant.RIGHT_CUT, incl_mdl_gain=info_theo_scores["absolute_gain"],
-            excl_mdl_gain=info_theo_scores["absolute_gain_excl"],
-            coverage_excl=excl_right_coverage, coverage_incl=incl_right_coverage,
-            normalized_gain_excl=info_theo_scores["absolute_gain_excl"] / excl_right_coverage,
-            normalized_gain_incl=info_theo_scores["absolute_gain"] / excl_right_coverage, # Question: Shouldn't this be incl_coverage? 
-            _rule=0
-        )
-
-        # Ratio of coverage after the grow step to the coverage of the rule before the grow step
-        # This is the gain of the grow step
-        if incl_or_excl == "incl":
-            right_grow_info[f"coverage_percentage"] = right_grow_info[f"coverage_incl"] / self.coverage
-        else:
-            right_grow_info[f"coverage_percentage"] = right_grow_info[f"coverage_excl"] / self.coverage_excl                
-
-        
-        # Calculate the MDL gain
-        info_theo_scores = self.calculate_mdl_gain(bi_array=left_bi_array, excl_bi_array=excl_left_bi_array,
-                                                icol=icol, cut_option=constant.LEFT_CUT, log=log)
-
-        # Store info in a dictionary
-        left_grow_info = store_grow_info(
-            excl_bi_array=excl_left_bi_array, incl_bi_array=left_bi_array, icol=icol,
-            cut=cut, cut_option=constant.LEFT_CUT, incl_mdl_gain=info_theo_scores["absolute_gain"],
-            excl_mdl_gain=info_theo_scores["absolute_gain_excl"],
-            coverage_excl=excl_left_coverage, coverage_incl=incl_left_coverage,
-            normalized_gain_excl=info_theo_scores["absolute_gain_excl"] / excl_left_coverage,
-            normalized_gain_incl=info_theo_scores["absolute_gain"] / excl_left_coverage, # Question: Shouldn't this be incl_coverage?    
-            _rule=0
-        )
-
-        # Ratio of coverage after the grow step to the coverage of the rule before the grow step
-        # This is the gain of the grow step
-        if incl_or_excl == "incl":
-            left_grow_info[f"coverage_percentage"] = left_grow_info[f"coverage_incl"] / self.coverage
-        else:
-            left_grow_info[f"coverage_percentage"] = left_grow_info[f"coverage_excl"] / self.coverage_excl
-
-        s = time.time()
-        # Update the beams if the grow step is valid
-        # TODO: Serializing the info objects is a major bottleneck
-        if _validity[f"res_{incl_or_excl}"]:
-            results.append( (left_grow_info, right_grow_info) ) 
-        if self.data_info.alg_config.log_learning_process > 2 and log:
-            self.data_info.time_logger.info(f"0,{time.time() - s}, Put results in list")
+            # Update the beams if the grow step is valid
+            if _validity[f"res_{incl_or_excl}"]:
+                results.append( (left_grow_info, right_grow_info) ) 
+            if self.data_info.alg_config.log_learning_process > 2 and log:
+                self.data_info.time_logger.info(f"0,{time.time() - s}, Put results in list")
+                self.data_info.time_logger.info(f"0,{time.time() - s_tot}, Grow_one_literal after overhead")
+        except:
+            self.data_info.logger.error(f"Error in grow_one_literal: {sys.exc_info()}")
+            raise
         return None, None
             
             
             
 
-    def calculate_mdl_gain(self, bi_array, excl_bi_array, icol, cut_option, log=False):
+    def calculate_mdl_gain(self, data, indices, indptr, bi_array, excl_bi_array, icol, cut_option, log=False):
         """ Calculate the MDL gain when adding a cut to the rule by calling various functions in the model and data encoding.
         
         Parameters
@@ -392,31 +259,34 @@ class Rule:
           : dict
             Containing codelengths and gains for this split
         """
+        try:
+            data_encoding, model_encoding = self.ruleset.data_encoding, self.ruleset.model_encoding
 
-        data_encoding, model_encoding = self.ruleset.data_encoding, self.ruleset.model_encoding
+            s = time.time()
+            cl_model = model_encoding.cl_model_after_growing_rule(data, indices, indptr, rule=self, ruleset=self.ruleset, icol=icol,
+                                                                        cut_option=cut_option, log=log)
+            if self.data_info.alg_config.log_learning_process > 2 and log:
+                self.data_info.time_logger.info(f"0,{time.time() - s},CL model")
+            
+            s = time.time()
+            cl_data = data_encoding.get_cl_data_incl(self.ruleset, self, excl_bi_array=excl_bi_array, incl_bi_array=bi_array)
+            if self.data_info.alg_config.log_learning_process > 2 and log:
+                self.data_info.time_logger.info(f"0,{time.time() - s},CL data incl")
+            
+            s = time.time()
+            cl_data_excl = data_encoding.get_cl_data_excl(self.ruleset, self, excl_bi_array)
+            if self.data_info.alg_config.log_learning_process > 2 and log:
+                self.data_info.time_logger.info(f"0,{time.time() - s},CL data excl")
 
-        s = time.time()
-        cl_model = model_encoding.cl_model_after_growing_rule(rule=self, ruleset=self.ruleset, icol=icol,
-                                                                      cut_option=cut_option, log=log)
-        if self.data_info.alg_config.log_learning_process > 2 and log:
-            self.data_info.time_logger.info(f"0,{time.time() - s},CL model")
+            absolute_gain = self.ruleset.total_cl - cl_data - cl_model
+            absolute_gain_excl = self.ruleset.total_cl - cl_data_excl - cl_model
+
+            return {"cl_model": cl_model, "cl_data": cl_data, "cl_data_excl": cl_data_excl,
+                    "absolute_gain": absolute_gain, "absolute_gain_excl": absolute_gain_excl}
+        except:
+            self.data_info.logger.error(f"Error in calculate_mdl_gain:")
+            raise
         
-        s = time.time()
-        cl_data = data_encoding.get_cl_data_incl(self.ruleset, self, excl_bi_array=excl_bi_array, incl_bi_array=bi_array)
-        if self.data_info.alg_config.log_learning_process > 2 and log:
-            self.data_info.time_logger.info(f"0,{time.time() - s},CL data incl")
-        
-        s = time.time()
-        cl_data_excl = data_encoding.get_cl_data_excl(self.ruleset, self, excl_bi_array)
-        if self.data_info.alg_config.log_learning_process > 2 and log:
-            self.data_info.time_logger.info(f"0,{time.time() - s},CL data excl")
-
-        absolute_gain = self.ruleset.total_cl - cl_data - cl_model
-        absolute_gain_excl = self.ruleset.total_cl - cl_data_excl - cl_model
-
-        return {"cl_model": cl_model, "cl_data": cl_data, "cl_data_excl": cl_data_excl,
-                "absolute_gain": absolute_gain, "absolute_gain_excl": absolute_gain_excl}
-
     def validity_check(self, icol, cut, bi_arrays):
         """ Control function for validity check
 
@@ -437,21 +307,25 @@ class Rule:
         : dict
             contains the validity including and excluding overlapping instances
         """
-        res_excl = True
-        res_incl = True
-        if self.data_info.alg_config.validity_check == "no_check":
-            pass
-        elif self.data_info.alg_config.validity_check == "excl_check":
-            res_excl = self.check_split_validity_excl(icol, bi_arrays)
-        elif self.data_info.alg_config.validity_check == "incl_check":
-            res_incl = self.check_split_validity(icol, bi_arrays)
-        elif self.data_info.alg_config.validity_check == "either":
-            res_excl = self.check_split_validity_excl(icol, bi_arrays)
-            res_incl = self.check_split_validity(icol, bi_arrays)
-        else:
-            # TODO: I should improve this error message a bit
-            sys.exit("Error: the if-else statement should not end up here")
-        return {"res_excl": res_excl, "res_incl": res_incl}
+        try:
+            res_excl = True
+            res_incl = True
+            if self.data_info.alg_config.validity_check == "no_check":
+                pass
+            elif self.data_info.alg_config.validity_check == "excl_check":
+                res_excl = self.check_split_validity_excl(icol, bi_arrays)
+            elif self.data_info.alg_config.validity_check == "incl_check":
+                res_incl = self.check_split_validity(icol, bi_arrays)
+            elif self.data_info.alg_config.validity_check == "either":
+                res_excl = self.check_split_validity_excl(icol, bi_arrays)
+                res_incl = self.check_split_validity(icol, bi_arrays)
+            else:
+                # TODO: I should improve this error message a bit
+                sys.exit("Error: the if-else statement should not end up here")
+            return {"res_excl": res_excl, "res_incl": res_incl}
+        except:
+            self.data_info.logger.error(f"Error in validity_check:")
+            raise
 
     def check_split_validity(self, icol, bi_arrays):
         """ Check validity when considering overlapping instances
@@ -470,32 +344,35 @@ class Rule:
         : bool
             Whether the split is valid
         """
-        indices_left, indices_right = np.where(bi_arrays["left"])[0], np.where(bi_arrays["right"])[0]
+        try:
+            indices_left, indices_right = np.where(bi_arrays["left"])[0], np.where(bi_arrays["right"])[0]
 
-        # Compute probabilities for the coverage of the rule and both sides of the split
-        p_left = utils_calculating_cl.calc_probs(self.data_info.target[indices_left], self.data_info.num_class)
-        p_right = utils_calculating_cl.calc_probs(self.data_info.target[indices_right], self.data_info.num_class)
+            # Compute probabilities for the coverage of the rule and both sides of the split
+            p_left = utils_calculating_cl.calc_probs(self.data_info.target[indices_left], self.data_info.num_class)
+            p_right = utils_calculating_cl.calc_probs(self.data_info.target[indices_right], self.data_info.num_class)
 
-        # Compute the negative log-likelihoods for these probabilities
-        nll_rule = utils_calculating_cl.calc_negloglike(self.prob, self.coverage)
-        nll_left = utils_calculating_cl.calc_negloglike(p_left, len(indices_left))
-        nll_right = utils_calculating_cl.calc_negloglike(p_right, len(indices_right))
+            # Compute the negative log-likelihoods for these probabilities
+            nll_rule = utils_calculating_cl.calc_negloglike(self.prob, self.coverage)
+            nll_left = utils_calculating_cl.calc_negloglike(p_left, len(indices_left))
+            nll_right = utils_calculating_cl.calc_negloglike(p_right, len(indices_right))
 
-        # The extra model code length this split would add
-        cl_model_extra = self.ruleset.model_encoding.cached_cl_model["l_cut"][0][icol]  # 0 represents for the "one split cut", instead of "two-splits cut"
-        cl_model_extra += np.log2(self.ruleset.model_encoding.data_ncol_for_encoding)
-        num_vars = np.sum(self.condition_bool > 0)
-        cl_model_extra += self.ruleset.model_encoding.cached_cl_model["l_number_of_variables"][num_vars + 1] - \
-                        self.ruleset.model_encoding.cached_cl_model["l_number_of_variables"][num_vars]
+            # The extra model code length this split would add
+            cl_model_extra = self.ruleset.model_encoding.cached_cl_model["l_cut"][0][icol]  # 0 represents for the "one split cut", instead of "two-splits cut"
+            cl_model_extra += np.log2(self.ruleset.model_encoding.data_ncol_for_encoding)
+            num_vars = np.sum(self.condition_bool > 0)
+            cl_model_extra += self.ruleset.model_encoding.cached_cl_model["l_number_of_variables"][num_vars + 1] - \
+                            self.ruleset.model_encoding.cached_cl_model["l_number_of_variables"][num_vars]
 
-        # if this validity score is positive, the split decreases the total code length
-        validity = nll_rule + nml_regret.regret(self.coverage, self.data_info.num_class) \
-                    - nll_left - nml_regret.regret(len(indices_left), self.data_info.num_class) \
-                    - nll_right - nml_regret.regret(len(indices_right), self.data_info.num_class) \
-                    - cl_model_extra
+            # if this validity score is positive, the split decreases the total code length
+            validity = nll_rule + nml_regret.regret(self.coverage, self.data_info.num_class) \
+                        - nll_left - nml_regret.regret(len(indices_left), self.data_info.num_class) \
+                        - nll_right - nml_regret.regret(len(indices_right), self.data_info.num_class) \
+                        - cl_model_extra
 
-        return (validity > 0)
-
+            return (validity > 0)
+        except:
+            self.data_info.logger.error(f"Error in check_split_validity:")
+            raise
         
 
     def check_split_validity_excl(self, icol, bi_arrays):
@@ -515,31 +392,35 @@ class Rule:
         : bool
             Whether the split is valid
         """
-        indices_left, indices_right = np.where(bi_arrays["excl_left"])[0], np.where(bi_arrays["excl_right"])[0]
+        try:
+            indices_left, indices_right = np.where(bi_arrays["excl_left"])[0], np.where(bi_arrays["excl_right"])[0]
 
-        # Compute probabilities for the coverage of the rule and both sides of the split
-        p_left = utils_calculating_cl.calc_probs(self.data_info.target[indices_left], self.data_info.num_class)
-        p_right = utils_calculating_cl.calc_probs(self.data_info.target[indices_right], self.data_info.num_class)
+            # Compute probabilities for the coverage of the rule and both sides of the split
+            p_left = utils_calculating_cl.calc_probs(self.data_info.target[indices_left], self.data_info.num_class)
+            p_right = utils_calculating_cl.calc_probs(self.data_info.target[indices_right], self.data_info.num_class)
 
-        # Compute the negative log-likelihoods for these probabilities
-        nll_rule = utils_calculating_cl.calc_negloglike(self.prob_excl, self.coverage_excl)
-        nll_left = utils_calculating_cl.calc_negloglike(p_left, len(indices_left))
-        nll_right = utils_calculating_cl.calc_negloglike(p_right, len(indices_right))
+            # Compute the negative log-likelihoods for these probabilities
+            nll_rule = utils_calculating_cl.calc_negloglike(self.prob_excl, self.coverage_excl)
+            nll_left = utils_calculating_cl.calc_negloglike(p_left, len(indices_left))
+            nll_right = utils_calculating_cl.calc_negloglike(p_right, len(indices_right))
 
-        # The extra model code length this split would add
-        cl_model_extra = self.ruleset.model_encoding.cached_cl_model["l_cut"][0][icol]  # 0 represents for the "one split cut", instead of "two-splits cut"
-        cl_model_extra += np.log2(self.ruleset.model_encoding.data_ncol_for_encoding)
-        num_vars = np.sum(self.condition_bool > 0)
-        cl_model_extra += self.ruleset.model_encoding.cached_cl_model["l_number_of_variables"][num_vars + 1] - \
-                        self.ruleset.model_encoding.cached_cl_model["l_number_of_variables"][num_vars]
+            # The extra model code length this split would add
+            cl_model_extra = self.ruleset.model_encoding.cached_cl_model["l_cut"][0][icol]  # 0 represents for the "one split cut", instead of "two-splits cut"
+            cl_model_extra += np.log2(self.ruleset.model_encoding.data_ncol_for_encoding)
+            num_vars = np.sum(self.condition_bool > 0)
+            cl_model_extra += self.ruleset.model_encoding.cached_cl_model["l_number_of_variables"][num_vars + 1] - \
+                            self.ruleset.model_encoding.cached_cl_model["l_number_of_variables"][num_vars]
 
-        # if this validity score is positive, the split decreases the total code length
-        validity = nll_rule + nml_regret.regret(self.coverage_excl, self.data_info.num_class) \
-                    - nll_left - nml_regret.regret(len(indices_left), self.data_info.num_class) \
-                    - nll_right - nml_regret.regret(len(indices_right), self.data_info.num_class) \
-                    - cl_model_extra
+            # if this validity score is positive, the split decreases the total code length
+            validity = nll_rule + nml_regret.regret(self.coverage_excl, self.data_info.num_class) \
+                        - nll_left - nml_regret.regret(len(indices_left), self.data_info.num_class) \
+                        - nll_right - nml_regret.regret(len(indices_right), self.data_info.num_class) \
+                        - cl_model_extra
 
-        return (validity > 0)
+            return (validity > 0)
+        except:
+            self.data_info.logger.error(f"Error in check_split_validity_excl:")
+            raise
 
     def __str__(self):
         return self.to_string()

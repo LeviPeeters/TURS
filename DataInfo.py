@@ -5,8 +5,9 @@ import numpy as np
 import os
 from datetime import datetime
 import logging
-from scipy.sparse import csc_array
+from scipy.sparse import csc_array, save_npz, load_npz
 import time
+import multiprocessing as mp
 
 import utils_namedtuple
 import utils_calculating_cl
@@ -34,7 +35,7 @@ class DataInfo:
         self.not_use_excl_ = not_use_excl_
 
         # TODO: Currently, TURS only works with sparse matrices. Eventually, it should be possible to choose between sparse and dense matrices
-        self.features = csc_array(X) # Sparse matrix
+        self.features = csc_array(X) # Sparse matrix        
         self.target = y
 
         assert type(self.target) == np.ndarray
@@ -42,6 +43,7 @@ class DataInfo:
         # Parameters to be stored internally
         self.max_grow_iter = self.alg_config.max_grow_iter
         self.feature_names = self.alg_config.feature_names
+        self.label_names = self.alg_config.label_names
         self.beam_width = self.alg_config.beam_width
         self.dataset_name = self.alg_config.dataset_name
         self.num_candidate_cuts = self.alg_config.num_candidate_cuts
@@ -125,6 +127,16 @@ class DataInfo:
                 self.time_logger.setLevel(logging.INFO)
                 self.time_logger.info("Thread,Time,Function")
     
+    def __getstate__(self):
+        """ Exclude the full data array, serializing it would take up too much memory."""
+        state = self.__dict__.copy()
+        del state["features"]
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+
+
     def candidate_cuts_quantile_midpoints(self, num_candidate_cuts):
         """ Calculate the candidate cuts for each numerical feature, using the quantile midpoints method.
         
@@ -140,6 +152,8 @@ class DataInfo:
         candidate_cuts : Dict
             Dictionary of candidate cuts for each feature
         """
+
+
         candidate_cuts = {}
 
         if type(num_candidate_cuts) is not list:
