@@ -65,6 +65,7 @@ for fold in range(5):
         max_grow_iter=500,
         num_class_as_given=None,
         beam_width=10,
+        chunksize=97,
         log_learning_process=3 if first_run else 0,
         log_folder_name=datetime.now().strftime("%Y%m%d_%H%M%s") + "_" + data_name,
         dataset_name=None,

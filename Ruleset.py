@@ -298,6 +298,16 @@ class Ruleset:
                 self.data_info.logger.info(f"Time report: \n{time_report}")
                 utils.time_report_boxplot(f"./logs/{self.data_info.alg_config.log_folder_name}")
 
+        # Clean up the global scope
+        if "data_info" in globals():
+            del globals()["data_info"]
+        if "finished" in globals():
+            del globals()["finished"]
+        if "ruleset_info" in globals():
+            del globals()["ruleset_info"]
+        if "modelling_groups" in globals():
+            del globals()["modelling_groups"]
+
         return total_cl
 
         

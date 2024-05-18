@@ -1,29 +1,96 @@
 import multiprocessing as mp
 import time
+import subprocess
 
-def setup(huts):
-    global huge_test_array
-    huge_test_array = huts
+import sys
+import os
+import pdb
 
-class Test:
-    def __init__(self):
-        self.unit = 4
-        huge_test_array = [x for x in range(10000000)]
-        # self.huge_test_array = [x for x in range(50000000)]
-        pool = mp.Pool(2, initializer=setup, initargs=(huge_test_array,))
-        unit = Unit()
-        pool.map(unit.func, [(x) for x in [1, 2, 3]])
+import numpy as np
+import pandas as pd
+import copy
+import time
+from datetime import datetime
+from guppy import hpy
 
-    def func(self, x):
-        # print(self.huge_test_array[15*x]*x)
-        print(huge_test_array[15*x]*x)
-        # print(x)
+from sklearn.model_selection import StratifiedKFold
 
-class Unit:
-    def func(self, x):
-        print(huge_test_array[15*x]*x)
+import utils_dataprep
+import TURS
+import utils_dataprep
+
+np.seterr(all='raise')
+print("Running TURS with multithreading")
+
+def run_turs(data_name, fold_given):
+    d = utils_dataprep.read_data(data_name)
+    X, y, class_labels, feature_names = utils_dataprep.preprocess_sparse(d)
+
+    kf = StratifiedKFold(n_splits=5, shuffle=True,
+                        random_state=2)  # can also use sklearn.model_selection.StratifiedKFold
+    kfold = kf.split(X=np.zeros(shape=y.shape), y=y)# X is not actually required, and sparse matrices are not supported
+    kfold_list = list(kfold)
+
+    times = []
+    first_run = True # to avoid logging multiple folds
+
+
+    for fold in range(5):
+        if fold_given is not None and fold != fold_given:
+            continue
+        print("running: ", data_name, "; fold: ", fold)
+
+        X_train = X[kfold_list[fold][0], :]
+        y_train = y[kfold_list[fold][0]]
+        X_test = X[kfold_list[fold][1], :]
+        y_test = y[kfold_list[fold][1]]
+
+        start_time = time.time()
+        
+        turs = TURS.TURS(
+            num_candidate_cuts=20,
+            max_num_rules=500,
+            max_grow_iter=500,
+            num_class_as_given=None,
+            beam_width=10,
+            chunksize=97,
+            log_learning_process=3 if first_run else 0,
+            log_folder_name=datetime.now().strftime("%Y%m%d_%H%M%s") + "_" + data_name,
+            dataset_name=None,
+            feature_names=feature_names,
+            which_features=None,
+            random_seed=None,
+            label_names=class_labels,
+            validity_check="either"
+        )
+
+        turs.fit(X_train, y_train)
+
+        end_time = time.time()
+        times.append(end_time - start_time)
+
+        first_run = False
+
+    print(f"Mean time: {np.mean(times)}")
+
 
 if __name__ == '__main__':
-    s = time.time()
-    Test()
-    print(time.time()-s)
+    h = hpy()
+    make_call_graph = False
+    log_learning_process = True
+
+    exp_res_alldata = []
+    date_and_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+
+    if len(sys.argv) == 3:
+        data_name=sys.argv[1]
+        fold_given=int(sys.argv[2])
+    elif len(sys.argv) == 2:
+        data_name=sys.argv[1]
+        fold_given=None
+    else:
+        data_name = "iris"
+        fold_given = 0
+
+    result = [subprocess.run(["python", "run_uci.py"], capture_output=True) for _ in range(5)]

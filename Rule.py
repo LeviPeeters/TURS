@@ -4,6 +4,7 @@ import dill
 import weakref
 import logging
 from functools import partial
+import tqdm
 
 import utils_calculating_cl
 import nml_regret
@@ -182,9 +183,46 @@ class Rule:
         # Make a list of all literals to be grown
         literals = []
         for icol in range(self.data_info.ncol):
+            bi_array = self.data_info.features[:, [icol]].todense().flatten()
             candidate_cuts_icol = self.get_candidate_cuts_icol_given_rule(candidate_cuts, icol)
+
             for cut in candidate_cuts_icol:
-                literals.append((icol, cut))
+                valid = True
+
+                 # Construct binary arrays indicating which features fall on each side of the cut
+                excl_left_bi_array = (bi_array[self.indices_excl] < cut)
+                excl_right_bi_array = ~excl_left_bi_array
+                left_bi_array = (bi_array[self.indices] < cut)
+                right_bi_array = ~left_bi_array
+
+                # Store all of the binary arrays in a dictionary to make them easy to pass to validity check
+                bi_arrays = {"left": left_bi_array, 
+                                "right": right_bi_array, 
+                                "excl_left": excl_left_bi_array,
+                                "excl_right": excl_right_bi_array}
+
+                # Check validity and skip if not valid
+                _validity = self.validity_check(icol=icol, bi_arrays=bi_arrays)
+
+                if self.data_info.not_use_excl_:
+                    _validity["res_excl"] = False
+
+                if _validity["res_excl"] == False and _validity["res_incl"] == False:
+                    valid = False 
+
+                excl_left_coverage, excl_right_coverage = np.count_nonzero(excl_left_bi_array), np.count_nonzero(
+                    excl_right_bi_array)
+
+                # Question: Why is there no check on incl_coverage being 0?
+                if excl_left_coverage == 0 or excl_right_coverage == 0:
+                    valid = False 
+                
+                if valid:
+                    literals.append((icol, cut))
+
+        # It's possible that no literals are valid, in which case we return the empty beam
+        if len(literals) == 0:
+            return beam
 
         # This information is needed in the growth process
         # The pool setup makes it globally available, so we don't need to pass the whole ruleset to the worker
@@ -198,6 +236,8 @@ class Rule:
 
         # Create a worker pool to grow the literals in parallel
         s = time.time()
+
+        # TODO: I think it's possible to keep the pool around for following iterations 
         pool = mp.Pool(mp.cpu_count(), initializer=setup_worker, initargs=(self.data_info, ruleset_info, self.ruleset.modelling_groups))
 
         # Define the global variables that the workers need
@@ -215,6 +255,7 @@ class Rule:
                 incl_gain_per_excl_coverage, excl_gain_per_excl_coverage = self.mdl_gain / self.coverage_excl, self.mdl_gain_excl / self.coverage_excl
         
         # Initialize the worker class
+        # TODO no way these are all needed
         worker_args = (self.indices, 
                             self.indices_excl, 
                             self.condition_matrix, 
@@ -229,11 +270,14 @@ class Rule:
         # with dill.detect.trace("dill_trace.log", mode='w'):
         #     dill.dumps(worker)
 
-        results = pool.starmap_async(worker_wrapper, [(worker_args, (incl_or_excl, literal[0], literal[1], i, log)) for i, literal in enumerate(literals)], chunksize=4)
-        results.wait()
-        results = results.get()
+        results = mp.Manager().list([None] * len(literals))
+
+        res = pool.starmap_async(worker_wrapper, tqdm.tqdm([(worker_args, (incl_or_excl, literal[0], literal[1], results, i, log)) for i, literal in enumerate(literals)], total=len(literals)), chunksize=self.data_info.chunksize)
+        res.wait()
         pool.close()
 
+        # setup_worker(self.data_info, ruleset_info, self.ruleset.modelling_groups)
+        # worker = RuleWorker(*worker_args)
         # [worker.grow_one_literal(incl_or_excl, literal[0], literal[1], i, log) for i, literal in enumerate(literals)]
         
         if self.data_info.alg_config.log_learning_process > 2 and log:
@@ -389,6 +433,141 @@ class Rule:
             return l_num_rules + cl_model_rule_after_growing - cl_redundancy_rule_orders + ruleset.allrules_cl_model
         except:
             self.data_info.logger.error("Error in cl_model_after_growing_rule")
+            raise
+
+    def validity_check(self, icol, bi_arrays):
+        """ Control function for validity check
+
+        
+        Parameters
+        ---
+        rule : Rule object
+            Rule to be checked
+        icol : int
+            Index of the column for which the candidate cut is calculated
+        cut : float
+            Candidate cut
+        bi_arrays : dict
+            Binary arrays containing the instances covered by the rule left and right of the cut
+        
+        Returns
+        ---
+        : dict
+            contains the validity including and excluding overlapping instances
+        """
+        try:
+            res_excl = True
+            res_incl = True
+            if self.data_info.alg_config.validity_check == "no_check":
+                pass
+            elif self.data_info.alg_config.validity_check == "excl_check":
+                res_excl = self.check_split_validity_excl(icol, bi_arrays)
+            elif self.data_info.alg_config.validity_check == "incl_check":
+                res_incl = self.check_split_validity(icol, bi_arrays)
+            elif self.data_info.alg_config.validity_check == "either":
+                res_excl = self.check_split_validity_excl(icol, bi_arrays)
+                res_incl = self.check_split_validity(icol, bi_arrays)
+            else:
+                # TODO: I should improve this error message a bit
+                sys.exit("Error: the if-else statement should not end up here")
+            return {"res_excl": res_excl, "res_incl": res_incl}
+        except:
+            self.data_info.logger.error(f"Error in validity_check:")
+            raise
+
+    def check_split_validity(self, icol, bi_arrays):
+        """ Check validity when considering overlapping instances
+        
+        Parameters
+        ---
+        rule : Rule object
+            Rule to be checked
+        icol : int
+            Index of the column for which the candidate cut is calculated
+        bi_arrays : dict
+            Binary arrays containing the instances covered by the rule left and right of the cut
+        
+        Returns
+        ---
+        : bool
+            Whether the split is valid
+        """
+        try:
+            indices_left, indices_right = np.where(bi_arrays["left"])[0], np.where(bi_arrays["right"])[0]
+
+            # Compute probabilities for the coverage of the rule and both sides of the split
+            p_left = utils_calculating_cl.calc_probs(self.data_info.target[indices_left], self.data_info.num_class)
+            p_right = utils_calculating_cl.calc_probs(self.data_info.target[indices_right], self.data_info.num_class)
+
+            # Compute the negative log-likelihoods for these probabilities
+            nll_rule = utils_calculating_cl.calc_negloglike(self.prob, self.coverage)
+            nll_left = utils_calculating_cl.calc_negloglike(p_left, len(indices_left))
+            nll_right = utils_calculating_cl.calc_negloglike(p_right, len(indices_right))
+
+            # The extra model code length this split would add
+            cl_model_extra = self.data_info.cached_cl_model["l_cut"][0][icol]  # 0 represents for the "one split cut", instead of "two-splits cut"
+            cl_model_extra += np.log2(self.data_info.data_ncol_for_encoding)
+            num_vars = np.sum(self.condition_bool > 0)
+            cl_model_extra += self.data_info.cached_cl_model["l_number_of_variables"][num_vars + 1] - \
+                            self.data_info.cached_cl_model["l_number_of_variables"][num_vars]
+
+            # if this validity score is positive, the split decreases the total code length
+            validity = nll_rule + nml_regret.regret(self.coverage, self.data_info.num_class) \
+                        - nll_left - nml_regret.regret(len(indices_left), self.data_info.num_class) \
+                        - nll_right - nml_regret.regret(len(indices_right), self.data_info.num_class) \
+                        - cl_model_extra
+
+            return (validity > 0)
+        except:
+            data_info.logger.error(f"Error in check_split_validity:")
+            raise
+        
+
+    def check_split_validity_excl(self, icol, bi_arrays):
+        """ Check validity without considering overlapping instances
+        
+        Parameters
+        ---
+        rule : Rule object
+            Rule to be checked
+        icol : int
+            Index of the column for which the candidate cut is calculated
+        bi_arrays : dict
+            Binary arrays containing the instances covered by the rule left and right of the cut
+        
+        Returns
+        ---
+        : bool
+            Whether the split is valid
+        """
+        try:
+            indices_left, indices_right = np.where(bi_arrays["excl_left"])[0], np.where(bi_arrays["excl_right"])[0]
+
+            # Compute probabilities for the coverage of the rule and both sides of the split
+            p_left = utils_calculating_cl.calc_probs(self.data_info.target[indices_left], self.data_info.num_class)
+            p_right = utils_calculating_cl.calc_probs(self.data_info.target[indices_right], self.data_info.num_class)
+
+            # Compute the negative log-likelihoods for these probabilities
+            nll_rule = utils_calculating_cl.calc_negloglike(self.prob_excl, self.coverage_excl)
+            nll_left = utils_calculating_cl.calc_negloglike(p_left, len(indices_left))
+            nll_right = utils_calculating_cl.calc_negloglike(p_right, len(indices_right))
+
+            # The extra model code length this split would add
+            cl_model_extra = self.data_info.cached_cl_model["l_cut"][0][icol]  # 0 represents for the "one split cut", instead of "two-splits cut"
+            cl_model_extra += np.log2(self.data_info.data_ncol_for_encoding)
+            num_vars = np.sum(self.condition_bool > 0)
+            cl_model_extra += self.data_info.cached_cl_model["l_number_of_variables"][num_vars + 1] - \
+                            self.data_info.cached_cl_model["l_number_of_variables"][num_vars]
+
+            # if this validity score is positive, the split decreases the total code length
+            validity = nll_rule + nml_regret.regret(self.coverage_excl, self.data_info.num_class) \
+                        - nll_left - nml_regret.regret(len(indices_left), self.data_info.num_class) \
+                        - nll_right - nml_regret.regret(len(indices_right), self.data_info.num_class) \
+                        - cl_model_extra
+
+            return (validity > 0)
+        except:
+            data_info.logger.error(f"Error in check_split_validity_excl:")
             raise
 
     def __str__(self):
@@ -570,7 +749,7 @@ class RuleWorker:
         bool_array[indices] = True
         return bool_array
 
-    def grow_one_literal(self, incl_or_excl, icol, cut, result_index, log=False):
+    def grow_one_literal(self, incl_or_excl, icol, cut, result_list, result_index, log=False):
         try:
             s_tot  = time.time()
             bi_array = data_info.features[:, [icol]].todense().flatten()
@@ -582,28 +761,15 @@ class RuleWorker:
             right_bi_array = ~left_bi_array
 
             # Store all of the binary arrays in a dictionary to make them easy to pass to validity check
-            bi_arrays = {"left": left_bi_array, 
-                            "right": right_bi_array, 
-                            "excl_left": excl_left_bi_array,
-                            "excl_right": excl_right_bi_array}
-
-            # Check validity and skip if not valid
-            _validity = self.validity_check(icol=icol, bi_arrays=bi_arrays)
-
-            if data_info.not_use_excl_:
-                _validity["res_excl"] = False
-
-            if _validity["res_excl"] == False and _validity["res_incl"] == False:
-                return 
+            # bi_arrays = {"left": left_bi_array, 
+            #                 "right": right_bi_array, 
+            #                 "excl_left": excl_left_bi_array,
+            #                 "excl_right": excl_right_bi_array}
 
             incl_left_coverage, incl_right_coverage = np.count_nonzero(left_bi_array), np.count_nonzero(
                 right_bi_array)
             excl_left_coverage, excl_right_coverage = np.count_nonzero(excl_left_bi_array), np.count_nonzero(
                 excl_right_bi_array)
-
-            # Question: Why is there no check on incl_coverage being 0?
-            if excl_left_coverage == 0 or excl_right_coverage == 0:
-                return 
 
             # Calculate the MDL gain
             info_theo_scores = self.calculate_mdl_gain(bi_array=right_bi_array, excl_bi_array=excl_right_bi_array,
@@ -648,21 +814,22 @@ class RuleWorker:
             else:
                 left_grow_info[f"coverage_percentage"] = left_grow_info[f"coverage_excl"] / self.coverage_excl
 
-            s = time.time()
             # Update the beams if the grow step is valid
-            if _validity[f"res_{incl_or_excl}"]:
+            # if _validity[f"res_{incl_or_excl}"]:
                 # Make sure we do not overwrite a result that has already been written
-                # assert results[result_index] is None
+            assert result_list[result_index] is None
+            result_list[result_index] = (left_grow_info, right_grow_info)
 
-                # results[result_index] = (left_grow_info, right_grow_info)
-                # print(len([1 for result in results if result is not None]))
-                return (left_grow_info, right_grow_info)
+            # print(len([1 for result in results if result is not None]))
 
             if data_info.alg_config.log_learning_process > 2 and log:
-                data_info.time_logger.info(f"0,{time.time() - s}, Put results in list")
                 data_info.time_logger.info(f"0,{time.time() - s_tot}, Grow_one_literal after overhead")
-        except:
-            data_info.logger.error(f"Error in grow_one_literal: {sys.exc_info()}")
+            
+            return (left_grow_info, right_grow_info)
+        except Exception as e:
+            # log the entire traceback
+            # data_info.logger.exception(f"Error in grow_one_literal: {sys.exc_info()}")
+            data_info.logger.error(f"Error in grow_one_literal: {e}", exc_info=True)
             raise
         return None
             
@@ -708,141 +875,6 @@ class RuleWorker:
                     "absolute_gain": absolute_gain, "absolute_gain_excl": absolute_gain_excl}
         except:
             data_info.logger.error(f"Error in calculate_mdl_gain:")
-            raise
-        
-    def validity_check(self, icol, bi_arrays):
-        """ Control function for validity check
-
-        
-        Parameters
-        ---
-        rule : Rule object
-            Rule to be checked
-        icol : int
-            Index of the column for which the candidate cut is calculated
-        cut : float
-            Candidate cut
-        bi_arrays : dict
-            Binary arrays containing the instances covered by the rule left and right of the cut
-        
-        Returns
-        ---
-        : dict
-            contains the validity including and excluding overlapping instances
-        """
-        try:
-            res_excl = True
-            res_incl = True
-            if data_info.alg_config.validity_check == "no_check":
-                pass
-            elif data_info.alg_config.validity_check == "excl_check":
-                res_excl = self.check_split_validity_excl(icol, bi_arrays)
-            elif data_info.alg_config.validity_check == "incl_check":
-                res_incl = self.check_split_validity(icol, bi_arrays)
-            elif data_info.alg_config.validity_check == "either":
-                res_excl = self.check_split_validity_excl(icol, bi_arrays)
-                res_incl = self.check_split_validity(icol, bi_arrays)
-            else:
-                # TODO: I should improve this error message a bit
-                sys.exit("Error: the if-else statement should not end up here")
-            return {"res_excl": res_excl, "res_incl": res_incl}
-        except:
-            data_info.logger.error(f"Error in validity_check:")
-            raise
-
-    def check_split_validity(self, icol, bi_arrays):
-        """ Check validity when considering overlapping instances
-        
-        Parameters
-        ---
-        rule : Rule object
-            Rule to be checked
-        icol : int
-            Index of the column for which the candidate cut is calculated
-        bi_arrays : dict
-            Binary arrays containing the instances covered by the rule left and right of the cut
-        
-        Returns
-        ---
-        : bool
-            Whether the split is valid
-        """
-        try:
-            indices_left, indices_right = np.where(bi_arrays["left"])[0], np.where(bi_arrays["right"])[0]
-
-            # Compute probabilities for the coverage of the rule and both sides of the split
-            p_left = utils_calculating_cl.calc_probs(data_info.target[indices_left], data_info.num_class)
-            p_right = utils_calculating_cl.calc_probs(data_info.target[indices_right], data_info.num_class)
-
-            # Compute the negative log-likelihoods for these probabilities
-            nll_rule = utils_calculating_cl.calc_negloglike(self.prob, self.coverage)
-            nll_left = utils_calculating_cl.calc_negloglike(p_left, len(indices_left))
-            nll_right = utils_calculating_cl.calc_negloglike(p_right, len(indices_right))
-
-            # The extra model code length this split would add
-            cl_model_extra = data_info.cached_cl_model["l_cut"][0][icol]  # 0 represents for the "one split cut", instead of "two-splits cut"
-            cl_model_extra += np.log2(data_info.data_ncol_for_encoding)
-            num_vars = np.sum(self.condition_bool > 0)
-            cl_model_extra += data_info.cached_cl_model["l_number_of_variables"][num_vars + 1] - \
-                            data_info.cached_cl_model["l_number_of_variables"][num_vars]
-
-            # if this validity score is positive, the split decreases the total code length
-            validity = nll_rule + nml_regret.regret(self.coverage, data_info.num_class) \
-                        - nll_left - nml_regret.regret(len(indices_left), data_info.num_class) \
-                        - nll_right - nml_regret.regret(len(indices_right), data_info.num_class) \
-                        - cl_model_extra
-
-            return (validity > 0)
-        except:
-            data_info.logger.error(f"Error in check_split_validity:")
-            raise
-        
-
-    def check_split_validity_excl(self, icol, bi_arrays):
-        """ Check validity without considering overlapping instances
-        
-        Parameters
-        ---
-        rule : Rule object
-            Rule to be checked
-        icol : int
-            Index of the column for which the candidate cut is calculated
-        bi_arrays : dict
-            Binary arrays containing the instances covered by the rule left and right of the cut
-        
-        Returns
-        ---
-        : bool
-            Whether the split is valid
-        """
-        try:
-            indices_left, indices_right = np.where(bi_arrays["excl_left"])[0], np.where(bi_arrays["excl_right"])[0]
-
-            # Compute probabilities for the coverage of the rule and both sides of the split
-            p_left = utils_calculating_cl.calc_probs(data_info.target[indices_left], data_info.num_class)
-            p_right = utils_calculating_cl.calc_probs(data_info.target[indices_right], data_info.num_class)
-
-            # Compute the negative log-likelihoods for these probabilities
-            nll_rule = utils_calculating_cl.calc_negloglike(self.prob_excl, self.coverage_excl)
-            nll_left = utils_calculating_cl.calc_negloglike(p_left, len(indices_left))
-            nll_right = utils_calculating_cl.calc_negloglike(p_right, len(indices_right))
-
-            # The extra model code length this split would add
-            cl_model_extra = data_info.cached_cl_model["l_cut"][0][icol]  # 0 represents for the "one split cut", instead of "two-splits cut"
-            cl_model_extra += np.log2(data_info.data_ncol_for_encoding)
-            num_vars = np.sum(self.condition_bool > 0)
-            cl_model_extra += data_info.cached_cl_model["l_number_of_variables"][num_vars + 1] - \
-                            data_info.cached_cl_model["l_number_of_variables"][num_vars]
-
-            # if this validity score is positive, the split decreases the total code length
-            validity = nll_rule + nml_regret.regret(self.coverage_excl, data_info.num_class) \
-                        - nll_left - nml_regret.regret(len(indices_left), data_info.num_class) \
-                        - nll_right - nml_regret.regret(len(indices_right), data_info.num_class) \
-                        - cl_model_extra
-
-            return (validity > 0)
-        except:
-            data_info.logger.error(f"Error in check_split_validity_excl:")
             raise
 
     def rule_cl_model_dep(self, condition_matrix, col_orders, log=False):

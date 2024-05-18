@@ -3,7 +3,7 @@ from collections import namedtuple
 AlgConfig = namedtuple('AlgConfig', [
             "beam_width",
             "num_candidate_cuts", "max_num_rules", "max_grow_iter",
-            "num_class_as_given", "log_learning_process", "log_folder_name",
+            "num_class_as_given", "chunksize", "log_learning_process", "log_folder_name",
             "dataset_name", "feature_names", "which_features",
             "random_seed", "label_names",
             "validity_check"

@@ -23,6 +23,7 @@ class DataInfo:
                 max_grow_iter=200, 
                 num_class_as_given=None,
                 beam_width=beam_width,
+                chunksize=8,
                 log_learning_process=1,
                 dataset_name=None,
                 feature_names=["X" + str(i) for i in range(X.shape[1])],
@@ -48,6 +49,7 @@ class DataInfo:
         self.dataset_name = self.alg_config.dataset_name
         self.num_candidate_cuts = self.alg_config.num_candidate_cuts
         self.nrow, self.ncol = X.shape[0], X.shape[1]
+        self.chunksize = self.alg_config.chunksize
         self.log_learning_process = self.alg_config.log_learning_process
         self.start_time = time.time()
 
