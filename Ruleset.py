@@ -294,9 +294,10 @@ class Ruleset:
             self.data_info.logger.info(str(self))
             self.data_info.logger.info("\n")
             if self.data_info.log_learning_process > 2:
-                time_report = utils.time_report(f"./logs/{self.data_info.alg_config.log_folder_name}").to_string()
-                self.data_info.logger.info(f"Time report: \n{time_report}")
-                utils.time_report_boxplot(f"./logs/{self.data_info.alg_config.log_folder_name}")
+                # time_report = utils.time_report(f"./logs/{self.data_info.alg_config.log_folder_name}").to_string()
+                # self.data_info.logger.info(f"Time report: \n{time_report}")
+                utils.time_report_per_literal(f"./logs/{self.data_info.alg_config.log_folder_name}")
+                utils.time_report_per_candidate(self.data_info.chunksize, f"./logs/{self.data_info.alg_config.log_folder_name}")
 
         # Clean up the global scope
         if "data_info" in globals():
@@ -466,8 +467,9 @@ class Ruleset:
 
         if self.data_info.log_learning_process > 0 and log:
             self.data_info.logger.info(f"Searching for rule in {incl_or_excl} beam.")
-        for rule in rules_for_next_iter:
+        for j, rule in enumerate(rules_for_next_iter):
             rule: Rule.Rule
+            self.data_info.current_candidate = j
 
             beam = rule.grow(incl_or_excl, log=log)
 

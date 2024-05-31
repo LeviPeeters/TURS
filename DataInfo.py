@@ -50,16 +50,20 @@ class DataInfo:
         self.num_candidate_cuts = self.alg_config.num_candidate_cuts
         self.nrow, self.ncol = X.shape[0], X.shape[1]
         self.chunksize = self.alg_config.chunksize
+        self.workers = self.alg_config.workers
         self.log_learning_process = self.alg_config.log_learning_process
         self.start_time = time.time()
 
+
         # Make a dictionary of categorical features and their possible values
+        # Also add the name of each feature to the list of feature names
+        self.numeric_features = []
         self.categorical_features = {}
         for name in self.feature_names:
             try:
                 feature, value = name.split("_")
             except ValueError:
-                pass
+                self.numeric_features.append(name)
             else:
                 if feature not in self.categorical_features:
                     self.categorical_features[feature] = [value]
@@ -112,6 +116,16 @@ class DataInfo:
                     self.logger.info(f"{key}: {value}")
             self.logger.info("Number of features: " + str(self.ncol))
             self.logger.info("\n")
+            self.logger.info("Features")
+            i = 1
+            for key, value in self.categorical_features.items():
+                self.logger.info(f"Feature {i}: {key} with {len(value)} values")
+                i += 1
+            for feature in self.numeric_features:
+                self.logger.info(f"Feature {i}: {feature}, numerical")
+                i += 1
+            self.logger.info("\n\n")
+
 
             # For logging information about the growth process to a CSV file
             handler3 = logging.FileHandler(filename=filename+"_growth.csv", encoding='utf-8', mode='w')
@@ -124,6 +138,7 @@ class DataInfo:
 
             self.current_rule = 0
             self.current_iteration = 0
+            self.current_candidate = 0
 
             if self.log_learning_process > 2:
                 # For logging the time taken for each function to a CSV file
@@ -133,7 +148,16 @@ class DataInfo:
                 self.time_logger = logging.getLogger("time_logger")
                 self.time_logger.addHandler(handler2)
                 self.time_logger.setLevel(logging.INFO)
-                self.time_logger.info("Thread,Time,Function")
+                self.time_logger.info("rule,iteration,candidate,time")
+
+            handler4 = logging.FileHandler(filename=filename+"_time_per_candidate.csv", encoding='utf-8', mode='w')
+            handler4.setFormatter(logging.Formatter('%(message)s'))
+            self.literal_logger: logging.RootLogger
+            self.literal_logger = logging.getLogger("literal_logger")
+            self.literal_logger.addHandler(handler4)
+            self.literal_logger.setLevel(logging.INFO)
+            self.literal_logger.info(f"Chunksize {self.chunksize}")
+            self.literal_logger.info("n_literals,time")
 
     def candidate_cuts_quantile_midpoints(self, num_candidate_cuts):
         """ Calculate the candidate cuts for each numerical feature, using the quantile midpoints method.

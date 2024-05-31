@@ -176,6 +176,8 @@ class Rule:
         if self.data_info.alg_config.log_learning_process > 1 and log:    
             self.data_info.logger.info(str(self))
 
+        s = time.time()
+
         beam = Beam.DiverseCovBeam(width=self.data_info.beam_width)
         
         candidate_cuts = self.data_info.candidate_cuts
@@ -234,11 +236,12 @@ class Rule:
                                     uncovered_indices=self.ruleset.uncovered_indices,
                                     allrules_regret=self.ruleset.allrules_regret)
 
-        # Create a worker pool to grow the literals in parallel
-        s = time.time()
-
         # TODO: I think it's possible to keep the pool around for following iterations 
-        pool = mp.Pool(mp.cpu_count(), initializer=setup_worker, initargs=(self.data_info, ruleset_info, self.ruleset.modelling_groups))
+        if self.data_info.alg_config.workers == -1:
+            pool = mp.Pool(mp.cpu_count(), initializer=setup_worker, initargs=(self.data_info, ruleset_info, self.ruleset.modelling_groups))
+        else:
+            pool = mp.Pool(self.data_info.alg_config.workers, initializer=setup_worker, initargs=(self.data_info, ruleset_info, self.ruleset.modelling_groups))
+
 
         # Define the global variables that the workers need
         # setup_worker(self.data_info, ruleset_info, self.ruleset.modelling_groups)
@@ -272,19 +275,27 @@ class Rule:
 
         results = mp.Manager().list([None] * len(literals))
 
-        res = pool.starmap_async(worker_wrapper, tqdm.tqdm([(worker_args, (incl_or_excl, literal[0], literal[1], results, i, log)) for i, literal in enumerate(literals)], total=len(literals)), chunksize=self.data_info.chunksize)
+        # If chunksize is 97, perform experiment with varying chunksize
+        if self.data_info.chunksize == 97:
+            chunksize = len(literals)//mp.cpu_count()
+            if chunksize < 1:
+                chunksize = 1
+            else:
+                chunksize = math.floor(chunksize)
+        else:
+            chunksize = self.data_info.chunksize
+
+        res = pool.starmap_async(worker_wrapper, tqdm.tqdm([(worker_args, (incl_or_excl, literal[0], literal[1], results, i, log)) for i, literal in enumerate(literals)], total=len(literals)), chunksize=chunksize)
         res.wait()
         pool.close()
 
         # setup_worker(self.data_info, ruleset_info, self.ruleset.modelling_groups)
         # worker = RuleWorker(*worker_args)
         # [worker.grow_one_literal(incl_or_excl, literal[0], literal[1], i, log) for i, literal in enumerate(literals)]
-        
-        if self.data_info.alg_config.log_learning_process > 2 and log:
-            self.data_info.time_logger.info(f"0,{time.time() - s},grow_one_literal with overhead")
 
         if self.data_info.alg_config.log_learning_process > 0 and log:
-            self.data_info.logger.info(f"Number of literals grown: {len([1 for result in results if result is not None])}")
+            n_literals = len([1 for result in results if result is not None])
+            self.data_info.literal_logger.info(f"{n_literals},{(time.time()-s)/n_literals}")
 
         for result in results:
 
@@ -331,15 +342,10 @@ class Rule:
 
             l_cuts = 0
 
-            if self.data_info.log_learning_process > 2 and log:
-                self.data_info.time_logger.info(f"0,{time.time() - s},CL model -> before loop")
-
             for index, col in enumerate(col_orders):
                 s = time.time()
                 feature = covered_features[:, [col]]
                 up_bound, low_bound = np.max(feature), np.min(feature)
-                if self.data_info.log_learning_process > 2 and log:
-                    self.data_info.time_logger.info(f"0,{time.time() - s},CL model -> calculate bounds")
 
                 s = time.time()
                 num_cuts = np.count_nonzero((self.data_info.candidate_cuts[col] >= low_bound) &
@@ -357,9 +363,6 @@ class Rule:
                     else:
                         l_cuts += 0
 
-                if self.data_info.log_learning_process > 2 and log:
-                    self.data_info.time_logger.info(f"0,{time.time() - s},CL model -> misc")
-
                 s = time.time()
                 # Now that we have "transmitted" a literal, we can drop data that the rule no longer covers
                 # This make the code length of the next literal smaller, as some cutting points might not be relevant anymore
@@ -374,8 +377,6 @@ class Rule:
                         temp = self.data_info.features[:, [col]].todense().flatten()
                         bool_ = bool_ & ((temp <= condition_matrix[0, col]) &
                                         (temp > condition_matrix[1, col]))
-                if self.data_info.log_learning_process > 2 and log:
-                    self.data_info.time_logger.info(f"0,{time.time() - s}, CL model-> drop uncovered data")
 
             return l_num_variables + l_which_variables + l_cuts
         except:
@@ -751,7 +752,7 @@ class RuleWorker:
 
     def grow_one_literal(self, incl_or_excl, icol, cut, result_list, result_index, log=False):
         try:
-            s_tot  = time.time()
+            s = time.time()
             bi_array = data_info.features[:, [icol]].todense().flatten()
 
             # Construct binary arrays indicating which features fall on each side of the cut
@@ -821,9 +822,8 @@ class RuleWorker:
             result_list[result_index] = (left_grow_info, right_grow_info)
 
             # print(len([1 for result in results if result is not None]))
-
             if data_info.alg_config.log_learning_process > 2 and log:
-                data_info.time_logger.info(f"0,{time.time() - s_tot}, Grow_one_literal after overhead")
+                data_info.time_logger.info(f"{data_info.current_rule},{data_info.current_iteration},{data_info.current_candidate},{time.time() - s}")
             
             return (left_grow_info, right_grow_info)
         except Exception as e:
@@ -853,20 +853,9 @@ class RuleWorker:
             Containing codelengths and gains for this split
         """
         try:
-            s = time.time()
             cl_model = self.cl_model_after_growing_rule(icol=icol, cut_option=cut_option, log=log)
-            if data_info.alg_config.log_learning_process > 2 and log:
-                data_info.time_logger.info(f"0,{time.time() - s},CL model")
-            
-            s = time.time()
             cl_data = self.get_cl_data_incl(excl_bi_array=excl_bi_array, incl_bi_array=bi_array)
-            if data_info.alg_config.log_learning_process > 2 and log:
-                data_info.time_logger.info(f"0,{time.time() - s},CL data incl")
-            
-            s = time.time()
             cl_data_excl = self.get_cl_data_excl(excl_bi_array)
-            if data_info.alg_config.log_learning_process > 2 and log:
-                data_info.time_logger.info(f"0,{time.time() - s},CL data excl")
 
             absolute_gain = ruleset_info.total_cl - cl_data - cl_model
             absolute_gain_excl = ruleset_info.total_cl - cl_data_excl - cl_model
@@ -895,8 +884,6 @@ class RuleWorker:
             Code length of the rule
         """
         try:
-            if data_info.log_learning_process > 2 and log:
-                s = time.time()
             # Count the conditions on each feature. Can be 0, 1 or 2. 
             condition_count = (~np.isnan(condition_matrix[0])).astype(int) + (~np.isnan(condition_matrix[1])).astype(int)
 
@@ -909,15 +896,10 @@ class RuleWorker:
 
             l_cuts = 0
 
-            if data_info.log_learning_process > 2 and log:
-                data_info.time_logger.info(f"0,{time.time() - s},CL model -> before loop")
-
             for index, col in enumerate(col_orders):
                 s = time.time()
                 feature = covered_features[:, [col]]
                 up_bound, low_bound = np.max(feature), np.min(feature)
-                if data_info.log_learning_process > 2 and log:
-                    data_info.time_logger.info(f"0,{time.time() - s},CL model -> calculate bounds")
 
                 s = time.time()
                 num_cuts = np.count_nonzero((data_info.candidate_cuts[col] >= low_bound) &
@@ -935,9 +917,6 @@ class RuleWorker:
                     else:
                         l_cuts += 0
 
-                if data_info.log_learning_process > 2 and log:
-                    data_info.time_logger.info(f"0,{time.time() - s},CL model -> misc")
-
                 s = time.time()
                 # Now that we have "transmitted" a literal, we can drop data that the rule no longer covers
                 # This make the code length of the next literal smaller, as some cutting points might not be relevant anymore
@@ -952,9 +931,6 @@ class RuleWorker:
                         temp = data_info.features[:, [col]].todense().flatten()
                         bool_ = bool_ & ((temp <= condition_matrix[0, col]) &
                                         (temp > condition_matrix[1, col]))
-                if data_info.log_learning_process > 2 and log:
-                    data_info.time_logger.info(f"0,{time.time() - s}, CL model-> drop uncovered data")
-
             return l_num_variables + l_which_variables + l_cuts
         except:
             data_info.logger.error("Error in rule_cl_model_dep")

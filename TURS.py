@@ -6,6 +6,7 @@ import DataInfo
 import Ruleset
 import utils_namedtuple
 import utils
+import os
 
 class TURS():
     def __init__(self,
@@ -15,6 +16,7 @@ class TURS():
                     num_class_as_given: int = None,
                     beam_width: int = 10,
                     chunksize: int = 8,
+                    workers: int = -1,
                     log_learning_process: int = 1,
                     log_folder_name: str = None,
                     dataset_name: str = None,
@@ -28,6 +30,10 @@ class TURS():
         if log_folder_name is None:
             log_folder_name = f"{datetime.now().strftime('%Y%m%d_%H%M')}"
         
+        if workers > os.cpu_count():
+            workers = os.cpu_count()
+            #print(f"Number of workers is set to {workers} as it exceeds the number of available CPUs.")
+        
         self.alg_config = utils_namedtuple.AlgConfig(
             num_candidate_cuts=num_candidate_cuts, 
             max_num_rules=max_num_rules, 
@@ -35,6 +41,7 @@ class TURS():
             num_class_as_given=num_class_as_given,
             beam_width=beam_width,
             chunksize=chunksize,
+            workers=workers,
             log_learning_process=log_learning_process,
             log_folder_name=log_folder_name,
             dataset_name=dataset_name,
