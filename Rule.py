@@ -2,7 +2,7 @@ import numpy as np
 import sys
 import logging
 from functools import partial
-import tqdm
+# import tqdm
 
 import utils_calculating_cl
 import nml_regret
@@ -282,7 +282,7 @@ class Rule:
         else:
             chunksize = self.data_info.chunksize
 
-        res = pool.starmap_async(worker_wrapper, tqdm.tqdm([(worker_args, (incl_or_excl, literal[0], literal[1], results, i, log)) for i, literal in enumerate(literals)], total=len(literals)), chunksize=chunksize)
+        res = pool.starmap_async(worker_wrapper, [(worker_args, (incl_or_excl, literal[0], literal[1], results, i, log)) for i, literal in enumerate(literals)], chunksize=chunksize)
         res.wait()
         pool.close()
 
