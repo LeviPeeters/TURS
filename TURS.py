@@ -1,11 +1,9 @@
 # API
-
 from datetime import datetime
 
 import DataInfo
 import Ruleset
 import utils_namedtuple
-import utils
 import os
 
 class TURS():
@@ -52,25 +50,6 @@ class TURS():
             validity_check=validity_check
         )
 
-        self.call_graph_custom_include = [
-            "Beam.*",
-            "exp_utils.*",
-            "ModellingGroup.*",
-            "nml_regret.*",
-            "Rule.*",
-            "RuleGrowConstraint.*",
-            "utils_modelencoding.*",
-            "utils_namedtuple.*",
-            "utils_predict.*",
-            "Ruleset.*", 
-            "ModelEncoding.*", 
-            "DataEncoding.*", 
-            "DataInfo.*", 
-            "utils_calculating_cl.*",  
-            "exp_predictive_perf.*",
-            "run_uci.*",
-        ]
-
     def fit(self, X_train, y_train):
         data_info = DataInfo.DataInfo(X=X_train, y=y_train, beam_width=None, alg_config=self.alg_config)
 
@@ -81,18 +60,6 @@ class TURS():
         self.ruleset.fit(max_iter=1000)
     
         return self.ruleset
-
-    def generate_call_graph(self, X_train, y_train, filepath="call_graph.png"):
-        global data_info
-        data_info = DataInfo.DataInfo(X=X_train, y=y_train, beam_width=None, alg_config=self.alg_config)
-
-        self.ruleset = Ruleset.Ruleset(
-            data_info=data_info, 
-        )
-
-        utils.call_graph_filtered(self.ruleset.fit, filepath, custom_include=self.call_graph_custom_include)
-        
-        print("Call graph generated at", filepath)
     
     def predict(self, X_test):
         return self.ruleset.predict_ruleset(X_test)

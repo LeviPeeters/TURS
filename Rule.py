@@ -1,7 +1,5 @@
 import numpy as np
 import sys
-import dill
-import weakref
 import logging
 from functools import partial
 import tqdm
@@ -11,7 +9,6 @@ import nml_regret
 import Beam
 import DataInfo
 import time
-from scipy.sparse import csc_array
 import multiprocessing as mp
 import math
 

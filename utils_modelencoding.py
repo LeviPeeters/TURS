@@ -1,4 +1,4 @@
-from scipy.special import gammaln, comb
+from scipy.special import gammaln
 import numpy as np
 from math import log
 
