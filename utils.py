@@ -32,6 +32,18 @@ class ElapsedTimeFormatter(logging.Formatter):
         self.start_time = time.time()
         return f"{elapsed} - {record.getMessage()}"
 
+class RegularFormatter(logging.Formatter):
+    """
+    A custom formatter for logging that includes the elapsed time between log entries.
+    """
+
+    def __init__(self):
+        pass
+
+    def format(self, record):
+        timestamp = time.strftime('%H:%M:%S', time.gmtime(time.time()))
+        return f"{timestamp} - {record.getMessage()}"
+
 def time_report(log_folder_path):
     # Read the csv file into a pandas dataframe
     df = pd.read_csv(f"{log_folder_path}/log_time.csv")

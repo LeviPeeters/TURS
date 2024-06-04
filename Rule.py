@@ -83,6 +83,12 @@ class Rule:
             else:
                 self.incl_gain_per_excl_coverage, self.excl_gain_per_excl_coverage = mdl_gain / self.coverage_excl, mdl_gain_excl / self.coverage_excl
 
+    # def __getstate__(self):
+    #     del self.data_info
+    #     return self.__dict__
+    
+    # def __setstate__(self, d):
+    #     self.__dict__ = d
 
 
     def _calc_probs(self, target):
@@ -207,7 +213,7 @@ class Rule:
             grow_info_beam.update(grow_info, grow_info[f"normalized_gain_{incl_or_excl}"], cov_percent)
         
 
-    def grow(self, grow_info_beam, incl_or_excl, log=False):
+    def grow(self, grow_info_beam, incl_or_excl):
         """ Grow the rule by one step and update the 
         
         Parameters
@@ -221,9 +227,10 @@ class Rule:
         ---
         None
         """
-        if self.data_info.alg_config.log_learning_process > 0 and log:
+        s = time.time()
+        if self.data_info.alg_config.log_learning_process > 0:
             self.data_info.growth_logger.info(f"{self.data_info.current_rule},{self.data_info.current_iteration},{self.coverage},{self.coverage_excl},{self.mdl_gain},{self.mdl_gain_excl}")
-        if self.data_info.alg_config.log_learning_process > 1 and log:    
+        if self.data_info.alg_config.log_learning_process > 1:    
             self.data_info.logger.info(str(self))
         
         candidate_cuts = self.data_info.candidate_cuts
@@ -276,16 +283,16 @@ class Rule:
                                       cut=cut, cut_option=constant.LEFT_CUT,
                                       incl_coverage=incl_left_coverage, excl_coverage=excl_left_coverage,
                                       grow_info_beam=grow_info_beam, incl_or_excl=incl_or_excl,
-                                      _validity=_validity, log=log)
+                                      _validity=_validity)
 
                 self.update_grow_beam(bi_array=right_bi_array, excl_bi_array=excl_right_bi_array, icol=icol,
                                       cut=cut, cut_option=constant.RIGHT_CUT,
                                       incl_coverage=incl_right_coverage, excl_coverage=excl_right_coverage,
                                       grow_info_beam=grow_info_beam, incl_or_excl=incl_or_excl,
-                                      _validity=_validity, log=log)
+                                      _validity=_validity)
 
-        if self.data_info.alg_config.log_learning_process > 2 and log:
-            self.data_info.time_logger.info(f"0,{total_time_getting_data},getting_data")
+        if self.data_info.alg_config.log_learning_process > 2:
+            self.data_info.time_logger.info(f"0,{s - time.time()},rule grow")
 
     def calculate_mdl_gain(self, bi_array, excl_bi_array, icol, cut_option, log=False):
         """ Calculate the MDL gain when adding a cut to the rule by calling various functions in the model and data encoding.
@@ -309,22 +316,11 @@ class Rule:
 
         data_encoding, model_encoding = self.ruleset.data_encoding, self.ruleset.model_encoding
 
-        s = time.time()
         cl_model = model_encoding.cl_model_after_growing_rule(rule=self, ruleset=self.ruleset, icol=icol,
                                                                       cut_option=cut_option, log=log)
-        if self.data_info.alg_config.log_learning_process > 2 and log:
-            self.data_info.time_logger.info(f"0,{time.time() - s},CL model")
-        
-        s = time.time()
         cl_data = data_encoding.get_cl_data_incl(self.ruleset, self, excl_bi_array=excl_bi_array, incl_bi_array=bi_array)
-        if self.data_info.alg_config.log_learning_process > 2 and log:
-            self.data_info.time_logger.info(f"0,{time.time() - s},CL data incl")
-        
-        s = time.time()
         cl_data_excl = data_encoding.get_cl_data_excl(self.ruleset, self, excl_bi_array)
-        if self.data_info.alg_config.log_learning_process > 2 and log:
-            self.data_info.time_logger.info(f"0,{time.time() - s},CL data excl")
-
+        
         absolute_gain = self.ruleset.total_cl - cl_data - cl_model
         absolute_gain_excl = self.ruleset.total_cl - cl_data_excl - cl_model
 
