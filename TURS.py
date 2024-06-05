@@ -32,7 +32,13 @@ class TURS():
         
         if workers > os.cpu_count():
             workers = os.cpu_count()
-            #print(f"Number of workers is set to {workers} as it exceeds the number of available CPUs.")
+            print(f"Number of workers is set to {workers} as it exceeds the number of available CPUs.")
+        elif workers == -1:
+            print(f"Number of workers is set to -1, so TURS is not multiprocessed for this run.")
+        
+        if chunksize != 1:
+            print("Chunksize is set to 1 for parallel expansion of rules")
+            chunksize = 1
         
         self.alg_config = utils_namedtuple.AlgConfig(
             num_candidate_cuts=num_candidate_cuts, 
@@ -70,6 +76,7 @@ class TURS():
         ]
 
     def fit(self, X_train, y_train):
+
         data_info = DataInfo.DataInfo(X=X_train, y=y_train, beam_width=None, alg_config=self.alg_config)
 
         self.ruleset = Ruleset.Ruleset(

@@ -5,6 +5,7 @@ import multiprocessing as mp
 import sys
 import math
 from functools import partial
+import dill
 
 import Beam
 import ModellingGroup
@@ -396,6 +397,9 @@ class Ruleset:
             # rules_for_next_iter is reversed, as the last rules have higher coverage and therefore take much longer to grow
             candidates = []
             for rule in rules_for_next_iter[::-1]:
+                # with dill.detect.trace("dill_trace.log", mode='w'):
+                #     dill.dumps(rule)
+                # breakpoint()
                 for incl_or_excl in ["incl", "excl"]:
                     candidates.append((rule, incl_or_excl))   
             
@@ -410,20 +414,23 @@ class Ruleset:
             results = mp.Manager().list()
 
             if self.data_info.alg_config.workers == -1:
+                # No multiprocessing 
                 pool = mp.Pool(mp.cpu_count(), initializer=setup_worker, initargs=(self.data_info, ruleset_info, self.modelling_groups))
+                setup_worker(self.data_info, ruleset_info, self.modelling_groups)
+                for candidate in candidates:
+                    expand_rule(candidate[0], candidate[1], results)
             else:
+                # Multiprocessing using the specified number of workers
                 pool = mp.Pool(self.data_info.alg_config.workers,  initializer=setup_worker, initargs=(self.data_info, ruleset_info, self.modelling_groups))
             
-            s = time.time()
-            res = pool.starmap_async(expand_rule, [(cand[0], cand[1], results) for i, cand in enumerate(candidates)])
-            res.wait()
-            pool.close()
-            if self.data_info.log_learning_process > 0:
-                self.data_info.time_logger.info(f"0,{time.time() - s},expand all rules")
+                s = time.time()
+                res = pool.starmap_async(expand_rule, [(cand[0], cand[1], results) for i, cand in enumerate(candidates)])
+                res.wait()
+                pool.close()
+                if self.data_info.log_learning_process > 0:
+                    self.data_info.time_logger.info(f"0,{time.time() - s},expand all rules")
 
-            # setup_worker(self.data_info, ruleset_info, self.modelling_groups)
-            # for candidate in candidates:
-            #     expand_rule(candidate[0], candidate[1], results)
+            
 
             beam_list_incl = []
             beam_list_excl = []
