@@ -5,7 +5,6 @@ import multiprocessing as mp
 import sys
 import math
 from functools import partial
-import dill
 
 import Beam
 import ModellingGroup

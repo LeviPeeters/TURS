@@ -1,18 +1,9 @@
 import sys
-import os
-
 import numpy as np
 import pandas as pd
-import copy
-import time
-from datetime import datetime
-import cProfile, pstats
 
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
-from sklearn.metrics import roc_auc_score, precision_recall_curve, f1_score, auc, log_loss
-from sklearn.model_selection import StratifiedKFold
-
-from scipy.sparse import hstack, csr_matrix, csc_matrix
+from scipy.sparse import hstack, csc_matrix
 
 def read_data(data_name):
     """ Read data from one of the standard datasets into a Pandas DataFrame
