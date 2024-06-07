@@ -400,8 +400,8 @@ class Ruleset:
                 #     dill.dumps(rule)
                 # breakpoint()
                 for incl_or_excl in ["incl", "excl"]:
-                    candidates.append((rule, incl_or_excl))   
-            
+                    candidates.append((rule, incl_or_excl))  
+                                
             # This is the information that will be passed to the workers
             ruleset_info = RulesetInfo( total_cl=self.total_cl, 
                                     n_rules=len(self.rules), 

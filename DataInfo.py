@@ -54,11 +54,12 @@ class DataInfo:
 
         # Make a dictionary of categorical features and their possible values
         self.categorical_features = {}
+        self.numerical_features = []
         for name in self.feature_names:
             try:
                 feature, value = name.split("_")
             except ValueError:
-                pass
+                self.numerical_features.append(name)
             else:
                 if feature not in self.categorical_features:
                     self.categorical_features[feature] = [value]
@@ -111,6 +112,16 @@ class DataInfo:
                     self.logger.info(f"{key}: {value}")
             self.logger.info("Number of features: " + str(self.ncol))
             self.logger.info("\n")
+
+            self.logger.info("Features")
+            i = 1
+            for key, value in self.categorical_features.items():
+                self.logger.info(f"Feature {i}: {key} with {len(value)} values")
+                i += 1
+            for feature in self.numerical_features:
+                self.logger.info(f"Feature {i}: {feature}, numerical")
+                i += 1
+            self.logger.info("\n\n")
 
             # For logging information about the growth process to a CSV file
             handler3 = logging.FileHandler(filename=filename+"_growth.csv", encoding='utf-8', mode='w')
