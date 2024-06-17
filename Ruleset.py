@@ -427,7 +427,7 @@ class Ruleset:
                 res = pool.starmap_async(expand_rule, [(cand[0], cand[1], results) for i, cand in enumerate(candidates)])
                 res.wait()
                 pool.close()
-                if self.data_info.log_learning_process > 0:
+                if self.data_info.log_learning_process > 2:
                     self.data_info.time_logger.info(f"0,{time.time() - s},expand all rules")
 
             

@@ -136,7 +136,7 @@ def preprocess_sparse(df):
         else:
             X = hstack((X, d_transformed)) # Note, this is the scipy hstack, not the numpy hstack
 
-    return X, y, unique_labels, feature_names
+    return X, y, list(unique_labels), feature_names
 
 def calculate_roc_auc_logloss(ruleset, y_test, y_pred_prob, y_train, y_pred_prob_train):
     """ Calculate various evaluation metrics using sklearn 
