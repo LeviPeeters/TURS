@@ -6,7 +6,7 @@ AlgConfig = namedtuple('AlgConfig', [
             "num_class_as_given", "chunksize", "workers",
             "log_learning_process", "log_folder_name",
             "dataset_name", "feature_names", "which_features",
-            "random_seed", "label_names",
+            "random_seed", "label_names", "probability_threshold",
             "validity_check"
         ])
 

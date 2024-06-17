@@ -43,9 +43,10 @@ def time_report_boxplot(log_folder_path):
     plt.figure(figsize=(10, 5))
     for i, name in enumerate(df["Function"].unique()):
         to_plot = df.loc[df["Function"] == name, "Time"].values
-        # Normalize the time distribution
-        to_plot = (to_plot - to_plot.min()) / (to_plot.max() - to_plot.min())
-        plt.boxplot(to_plot, labels=[name], positions=[i], vert=False)
+        if len(to_plot) > 1:
+            # Normalize the time distribution
+            to_plot = (to_plot - to_plot.min()) / (to_plot.max() - to_plot.min())
+            plt.boxplot(to_plot, labels=[name], positions=[i], vert=False)
     
     plt.tight_layout()
     plt.title("Normalized time distribution per function")

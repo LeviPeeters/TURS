@@ -29,6 +29,7 @@ class DataInfo:
                 dataset_name=None,
                 feature_names=["X" + str(i) for i in range(X.shape[1])],
                 label_names=np.unique(y),
+                probability_threshold=False,
                 validity_check="either"
             )
         else:

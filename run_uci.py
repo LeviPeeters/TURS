@@ -66,6 +66,7 @@ for fold in range(5):
         which_features=None,
         random_seed=None,
         label_names=class_labels,
+        probability_threshold=True,
         validity_check="either"
     )
 
