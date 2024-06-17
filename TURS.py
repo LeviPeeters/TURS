@@ -24,6 +24,7 @@ class TURS():
                     label_names: list = None,
                     which_features: list = None,
                     random_seed: int = None,
+                    probability_threshold: bool = False,
                     validity_check: str = "either"
                  ) -> None:
         
@@ -55,6 +56,7 @@ class TURS():
             label_names=label_names,
             which_features=which_features,
             random_seed=random_seed,
+            probability_threshold=probability_threshold,
             validity_check=validity_check
         )
 

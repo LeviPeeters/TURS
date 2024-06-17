@@ -119,6 +119,7 @@ class Ruleset:
         self.else_rule_p = utils_calculating_cl.calc_probs(target=data_info.target, num_class=data_info.num_class)
         self.else_rule_coverage = self.data_info.nrow
         self.elserule_total_cl = self.get_cl_data_elserule()
+        self.majority_class_prior_p = max(utils_calculating_cl.calc_probs(data_info.target, data_info.num_class))
 
         self.negloglike = -np.sum(data_info.nrow * np.log2(self.else_rule_p[self.else_rule_p != 0]) * self.else_rule_p[self.else_rule_p != 0])
         self.else_rule_negloglike = self.negloglike
@@ -341,7 +342,23 @@ class Ruleset:
         for group in groups_coverages:
             if len(group) == 0:
                 continue
-            final_info.append(group[np.argmax([info[f"normalized_gain_{incl_or_excl}"] for info in group])])
+
+            # If probability threshold is set, we remove rules with max probability below the majority class prior
+            # This is used to test whether TURS still performs if we disallow rules that reduce uncertainty in the else rule
+            if self.data_info.alg_config.probability_threshold is True:
+                while len(group) > 0:
+                    best_info_index = np.argmax([info[f"normalized_gain_{incl_or_excl}"] for info in group])
+                    best_info = group[best_info_index]
+                    if max(best_info["_rule"].prob) < self.majority_class_prior_p:
+                    # if max(best_info["_rule"].prob) < 0.97:
+                        group = np.delete(group, best_info_index)
+                    else:    
+                        final_info.append(best_info)
+                        break
+
+            else:
+                best_info = group[np.argmax([info[f"normalized_gain_{incl_or_excl}"] for info in group])]
+                final_info.append(best_info)
         
         return final_info
 
