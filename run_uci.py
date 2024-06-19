@@ -16,7 +16,7 @@ import TURS
 import utils_dataprep
 
 np.seterr(all='raise')
-print("Running TURS with multithreading")
+print("Running TURS with multirocessed rules")
 
 h = hpy()
 make_call_graph = False
