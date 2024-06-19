@@ -100,10 +100,8 @@ class TURS():
         utils.call_graph_filtered(self.ruleset.fit, filepath, custom_include=self.call_graph_custom_include)
         
         print("Call graph generated at", filepath)
+
     
-    def predict(self, X_test):
-        return self.ruleset.predict_ruleset(X_test)
-    
-    def predict_proba(self, X_test):
+    def predict_probabilities(self, X_test):
         return self.ruleset.predict_ruleset(X_test)
 

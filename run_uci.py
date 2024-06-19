@@ -9,7 +9,7 @@ import utils_dataprep
 import TURS
 
 np.seterr(all='raise')
-print("Running TURS with multithreading")
+print("Running TURS with multirocessed rules")
 
 make_call_graph = False
 log_learning_process = True

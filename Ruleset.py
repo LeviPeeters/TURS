@@ -17,13 +17,6 @@ import constant
 from utils_namedtuple import RulesetInfo
 
 
-def expand_rule(rule, incl_or_excl, results):
-    beam = Beam.DiverseCovBeam(width=data_info.beam_width)
-
-    rule.grow(grow_info_beam=beam, incl_or_excl=incl_or_excl)
-
-    results.append((beam, incl_or_excl))
-
 def make_rule_from_grow_info(grow_info):
     """ Make a rule from the information of a grow step
 
@@ -78,7 +71,6 @@ def extract_rules_from_beams(beams):
     for beam in beams:
         for info in beam.infos:
             # Check if there is already a rule with the same coverage
-            # TODO there must be a better way to do this
             if info["coverage_incl"] in coverage_list:
                 index_equal = coverage_list.index(info["coverage_incl"])
                 if np.all(rules[index_equal].indices == info["_rule"].indices[info["incl_bi_array"]]):
@@ -342,23 +334,25 @@ class Ruleset:
             if len(group) == 0:
                 continue
 
-            # If probability threshold is set, we remove rules with max probability below the majority class prior
-            # This is used to test whether TURS still performs if we disallow rules that reduce uncertainty in the else rule
-            if self.data_info.alg_config.probability_threshold is True:
-                while len(group) > 0:
-                    best_info_index = np.argmax([info[f"normalized_gain_{incl_or_excl}"] for info in group])
-                    best_info = group[best_info_index]
-                    if max(best_info["_rule"].prob) < self.majority_class_prior_p:
-                    # if max(best_info["_rule"].prob) < 0.97:
-                        group = np.delete(group, best_info_index)
-                    else:    
-                        final_info.append(best_info)
-                        break
+            # # If probability threshold is set, we remove rules with max probability below the majority class prior
+            # # This is used to test whether TURS still performs if we disallow rules that reduce uncertainty in the else rule
+            # if self.data_info.alg_config.probability_threshold is True:
+                
+            #     while len(group) > 0:
+            #         best_info_index = np.argmax([info[f"normalized_gain_{incl_or_excl}"] for info in group])
+            #         best_info = group[best_info_index]
+            #         if max(best_info["_rule"].prob) < self.majority_class_prior_p:
+            #         # if max(best_info["_rule"].prob) < 0.97:
+            #             # print(f" - {best_info['_rule']} - ")
+            #             group = np.delete(group, best_info_index)
+            #         else:    
+            #             final_info.append(best_info)
+            #             break
 
-            else:
-                best_info = group[np.argmax([info[f"normalized_gain_{incl_or_excl}"] for info in group])]
-                final_info.append(best_info)
-        
+            # else:
+            best_info = group[np.argmax([info[f"normalized_gain_{incl_or_excl}"] for info in group])]
+            final_info.append(best_info)
+
         return final_info
 
     def search_next_rule(self, 
@@ -410,9 +404,8 @@ class Ruleset:
                 self.data_info.logger.info("")
             
             # Create a list of candidates for the next iteration
-            # rules_for_next_iter is reversed, as the last rules have higher coverage and therefore take much longer to grow
             candidates = []
-            for rule in rules_for_next_iter[::-1]:
+            for rule in rules_for_next_iter:
                 # with dill.detect.trace("dill_trace.log", mode='w'):
                 #     dill.dumps(rule)
                 # breakpoint()
@@ -434,15 +427,23 @@ class Ruleset:
                 pool = mp.Pool(mp.cpu_count(), initializer=setup_worker, initargs=(self.data_info, ruleset_info, self.modelling_groups))
                 setup_worker(self.data_info, ruleset_info, self.modelling_groups)
                 for candidate in candidates:
-                    expand_rule(candidate[0], candidate[1], results)
+                    candidate[0].grow(results, candidate[1])
             else:
                 # Multiprocessing using the specified number of workers
-                pool = mp.Pool(self.data_info.alg_config.workers,  initializer=setup_worker, initargs=(self.data_info, ruleset_info, self.modelling_groups))
+                # pool = mp.Pool(self.data_info.alg_config.workers,  initializer=setup_worker, initargs=(self.data_info, ruleset_info, self.modelling_groups))
             
                 s = time.time()
-                res = pool.starmap_async(expand_rule, [(cand[0], cand[1], results) for i, cand in enumerate(candidates)])
-                res.wait()
-                pool.close()
+                # res = pool.starmap_async(expand_rule, [(cand[0], cand[1], results) for i, cand in enumerate(candidates)])
+                processes = []
+                setup_worker(self.data_info, ruleset_info, self.modelling_groups)
+                for candidate in candidates:
+                    process = mp.Process(target=candidate[0].grow, args=(results, candidate[1]))
+                    processes.append(process)
+                    process.start()
+                
+                for process in processes:
+                    process.join()
+
                 if self.data_info.log_learning_process > 2:
                     self.data_info.time_logger.info(f"0,{time.time() - s},expand all rules")
 
@@ -497,7 +498,14 @@ class Ruleset:
                 rules_for_next_iter = extract_rules_from_beams([final_beam_excl, final_beam_incl])
                 rules_candidates.extend(rules_for_next_iter)
 
-        which_best_ = np.argmax([r.incl_gain_per_excl_coverage for r in rules_candidates])
+        # If a probability threshold is set, we remove rules with max probability below the majority class prior
+        if self.data_info.alg_config.probability_threshold is True:
+            while True:
+                which_best_ = np.argmax([r.incl_gain_per_excl_coverage for r in rules_candidates])
+                if max(rules_candidates[which_best_].prob) < self.majority_class_prior_p:
+                    rules_candidates.pop(which_best_)
+                else:
+                    break
         return rules_candidates[which_best_]
 
 
@@ -623,77 +631,6 @@ class Ruleset:
 
         return prob_predicted
 
-    def predict_ruleset(self, X_test):
-        """ This function computes the local prediction using a ruleset, given a test set.
-        TODO: This does not work with sparse matrices yet
-        
-        Parameters
-        ----------
-        ruleset : RuleSet
-            The ruleset for which we want to compute the local prediction.
-        X_test : np.array
-            The test set.
-        
-        Returns
-        -------
-        : Array
-            Probability distributions for the prediction
-        """
-        if type(X_test) != np.ndarray:
-            X_test = X_test.to_numpy()
-
-        prob_predicted = np.zeros((len(X_test), self.data_info.num_class), dtype=float)
-        cover_matrix = np.zeros((len(X_test), len(self.rules) + 1), dtype=bool)
-
-        test_uncovered_bool = np.ones(len(X_test), dtype=bool)
-        for ir, rule in enumerate(self.rules):
-            r_bool_array = np.ones(len(X_test), dtype=bool)
-
-            condition_matrix = np.array(rule.condition_matrix)
-            condition_bool = np.array(rule.condition_bool)
-            which_vars = np.where(condition_bool > 0)[0]
-
-            upper_bound, lower_bound = condition_matrix[0], condition_matrix[1]
-            upper_bound[np.isnan(upper_bound)] = np.Inf
-            lower_bound[np.isnan(lower_bound)] = -np.Inf
-
-            for v in which_vars:
-                r_bool_array = r_bool_array & (X_test[:, v] < upper_bound[v]) & (X_test[:, v] >= lower_bound[v])
-
-            cover_matrix[:, ir] = r_bool_array
-            test_uncovered_bool = test_uncovered_bool & ~r_bool_array
-        cover_matrix[:, -1] = test_uncovered_bool
-
-        # From chatGPT: "I use dtype=object to allow the elements of powers_of_2 and binary_vector to be Python integers which can handle arbitrary large values."
-        # That is, by using "object", the element of numpy array becomes Python Int, instead of numpy.int64;
-        cover_matrix_int = cover_matrix.astype(int)
-        unique_id = np.zeros(len(X_test), dtype=object)
-        power_of_two = 2 ** np.arange(cover_matrix_int.shape[1], dtype=object)
-        for kol in range(cover_matrix_int.shape[1]):
-            # unique_id += 2 ** kol * cover_matrix_int[:, kol]    # This may fail when 2 ** kol becomes very large
-            unique_id += power_of_two[kol] * cover_matrix_int[:, kol].astype(object)
-
-        groups, ret_index = np.unique(unique_id, return_index=True)
-        unique_id_dir = {}
-        for g, rind in zip(groups, ret_index):
-            unique_id_dir[g] = cover_matrix_int[rind]
-
-        unique_id_prob_dir = {}
-        for z, t in unique_id_dir.items():
-            bool_model = np.zeros(len(self.data_info.target), dtype=bool)
-            for i_tt, tt in enumerate(t):
-                if tt == 1:
-                    if i_tt == len(self.rules):
-                        bool_model = self.uncovered_bool
-                    else:
-                        bool_model = np.bitwise_or(bool_model, self.rules[i_tt].bool_array)
-            unique_id_prob_dir[z] = utils_calculating_cl.calc_probs(self.data_info.target[bool_model],
-                                            self.data_info.num_class)
-
-        for i in range(len(prob_predicted)):
-            prob_predicted[i] = unique_id_prob_dir[unique_id[i]]
-
-        return prob_predicted
 
     def __str__(self):
         """ This function prints a ruleset in a readable way.
@@ -924,7 +861,7 @@ class Rule:
             grow_info_beam.update(grow_info, grow_info[f"normalized_gain_{incl_or_excl}"], cov_percent)
         
 
-    def grow(self, grow_info_beam, incl_or_excl):
+    def grow(self, results, incl_or_excl):
         """ Grow the rule by one step and update the 
         
         Parameters
@@ -943,6 +880,8 @@ class Rule:
             data_info.growth_logger.info(f"{data_info.current_rule},{data_info.current_iteration},{self.coverage},{self.coverage_excl},{self.mdl_gain},{self.mdl_gain_excl}")
         if data_info.alg_config.log_learning_process > 1:    
             data_info.logger.info(str(self))
+        
+        grow_info_beam = Beam.DiverseCovBeam(width=data_info.beam_width)
         
         candidate_cuts = data_info.candidate_cuts
 
@@ -1002,8 +941,12 @@ class Rule:
                                       grow_info_beam=grow_info_beam, incl_or_excl=incl_or_excl,
                                       _validity=_validity)
 
+        results.append((grow_info_beam, incl_or_excl))
+
         if data_info.alg_config.log_learning_process > 2:
             data_info.time_logger.info(f"0,{time.time()-s2},rule grow")
+        
+
 
     def calculate_mdl_gain(self, bi_array, excl_bi_array, icol, cut_option, log=False):
         """ Calculate the MDL gain when adding a cut to the rule by calling various functions in the model and data encoding.
