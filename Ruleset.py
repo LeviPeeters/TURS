@@ -506,6 +506,8 @@ class Ruleset:
                     rules_candidates.pop(which_best_)
                 else:
                     break
+        else:
+            which_best_ = np.argmax([r.incl_gain_per_excl_coverage for r in rules_candidates])
         return rules_candidates[which_best_]
 
 
@@ -576,7 +578,7 @@ class Ruleset:
             Probability distributions for the prediction
         """
         if type(X_test) != np.ndarray:
-            X_test = X_test.to_numpy()
+            X_test = X_test.todense()
 
         prob_predicted = np.zeros((len(X_test), self.data_info.num_class), dtype=float)
         cover_matrix = np.zeros((len(X_test), len(self.rules) + 1), dtype=bool)
