@@ -6,6 +6,7 @@ import sys
 import math
 from functools import partial
 import dill
+import os
 
 import Beam
 import ModellingGroup
@@ -108,7 +109,10 @@ class Ruleset:
 
         self.uncovered_indices = np.arange(data_info.nrow)
         self.uncovered_bool = np.ones(self.data_info.nrow, dtype=bool)
-        self.else_rule_p = utils_calculating_cl.calc_probs(target=data_info.target, num_class=data_info.num_class)
+        if self.data_info.alg_config.force_else_50_50:
+            self.else_rule_p = np.array([1./self.data_info.num_class] * self.data_info.num_class)
+        else:
+            self.else_rule_p = utils_calculating_cl.calc_probs(target=data_info.target, num_class=data_info.num_class)
         self.else_rule_coverage = self.data_info.nrow
         self.elserule_total_cl = self.get_cl_data_elserule()
         self.majority_class_prior_p = max(utils_calculating_cl.calc_probs(data_info.target, data_info.num_class))
@@ -170,7 +174,10 @@ class Ruleset:
         self.uncovered_bool = np.bitwise_and(self.uncovered_bool, ~rule.bool_array)
         self.uncovered_indices = np.where(self.uncovered_bool)[0]
         self.else_rule_coverage = len(self.uncovered_indices)
-        self.else_rule_p = utils_calculating_cl.calc_probs(self.data_info.target[self.uncovered_indices], self.data_info.num_class)
+        if self.data_info.alg_config.force_else_50_50:
+            self.else_rule_p = np.array([1./self.data_info.num_class] * self.data_info.num_class)
+        else:
+            self.else_rule_p = utils_calculating_cl.calc_probs(self.data_info.target[self.uncovered_indices], self.data_info.num_class)
         self.else_rule_negloglike = utils_calculating_cl.calc_negloglike(self.else_rule_p, self.else_rule_coverage)
 
     def get_negloglike_all_modelling_groups(self, rule):
@@ -268,7 +275,10 @@ class Ruleset:
                 self.data_info.logger.info(f"Time report: \n{time_report}")
                 utils.time_report_boxplot(f"./logs/{self.data_info.alg_config.log_folder_name}")
 
-        return total_cl
+        if self.data_info.alg_config.model_folder_name is not None:
+            folder_name = self.save_ruleset(f"./models/{self.data_info.alg_config.model_folder_name}")
+            print(f"Ruleset saved in {folder_name}")
+            return folder_name
 
     @staticmethod
     def calculate_stop_condition_element(incl_beam, excl_beam, prev_best_gain, prev_best_excl_gain):
@@ -335,22 +345,6 @@ class Ruleset:
             if len(group) == 0:
                 continue
 
-            # # If probability threshold is set, we remove rules with max probability below the majority class prior
-            # # This is used to test whether TURS still performs if we disallow rules that reduce uncertainty in the else rule
-            # if self.data_info.alg_config.probability_threshold is True:
-                
-            #     while len(group) > 0:
-            #         best_info_index = np.argmax([info[f"normalized_gain_{incl_or_excl}"] for info in group])
-            #         best_info = group[best_info_index]
-            #         if max(best_info["_rule"].prob) < self.majority_class_prior_p:
-            #         # if max(best_info["_rule"].prob) < 0.97:
-            #             # print(f" - {best_info['_rule']} - ")
-            #             group = np.delete(group, best_info_index)
-            #         else:    
-            #             final_info.append(best_info)
-            #             break
-
-            # else:
             best_info = group[np.argmax([info[f"normalized_gain_{incl_or_excl}"] for info in group])]
             final_info.append(best_info)
 
@@ -503,7 +497,7 @@ class Ruleset:
         if self.data_info.alg_config.probability_threshold is True:
             while True:
                 which_best_ = np.argmax([r.incl_gain_per_excl_coverage for r in rules_candidates])
-                if max(rules_candidates[which_best_].prob) < self.majority_class_prior_p:
+                if max(rules_candidates[which_best_].prob) < max(self.else_rule_p):
                     rules_candidates.pop(which_best_)
                 else:
                     break
@@ -553,7 +547,10 @@ class Ruleset:
         : float
             Code length of the data covered by the else rule
         """
-        p = self.calc_probs(self.data_info.target[self.uncovered_indices])
+        if self.data_info.alg_config.force_else_50_50:
+            p = np.array([1./self.data_info.num_class] * self.data_info.num_class)
+        else:
+            p = self.calc_probs(self.data_info.target[self.uncovered_indices])
 
         # Because of this below line of code, this function needs to be called after updating the ruleset's attributes
         coverage = len(self.uncovered_indices)
@@ -562,6 +559,72 @@ class Ruleset:
         reg = nml_regret.regret(coverage, self.data_info.num_class)
         return negloglike_rule + reg
 
+    def save_ruleset(self, folder_name):
+        """ 
+        Save all information that is relevant in order to be used as a prediction model later
+        """
+        i = 1
+        folder_name_new = folder_name
+        while os.path.exists(folder_name_new):
+            folder_name_new = folder_name + f"_{i}"
+            i += 1
+        folder_name = folder_name_new
+        os.mkdir(folder_name)
+
+        ruleset_info = {
+            "num_class": self.num_class,
+            "target": self.data_info.target,
+            "uncovered_bool": self.uncovered_bool,
+        }
+
+        dill.dump(ruleset_info, open(f"{folder_name}/ruleset_info.pkl", "wb"))
+        for i, rule in enumerate(self.rules):
+            dill.dump(rule, open(f"{folder_name}/rule_{i}.pkl", "wb"))
+        
+        return folder_name
+
+    def __str__(self):
+        """ This function prints a ruleset in a readable way.
+    
+        Parameters
+        ---
+        ruleset : RuleSet
+            The ruleset to be printed.
+        
+        Returns
+        ---
+        None
+        """
+        readable = ""
+        label_names = self.data_info.alg_config.label_names
+        for rule in self.rules:
+            readable += rule.to_string(verbose=True)
+            readable += "\n"
+        readable += "If none of above,\n"
+        readable += "Then:\n"
+        if len(self.else_rule_p) > 5:
+            readable += f"Highest probability is {max(self.else_rule_p)} for outcome {label_names[np.argmax(self.else_rule_p)]}"
+        else:
+            for i in range(len(label_names)):
+                readable += f"Probability of {label_names[i]} is {round(self.else_rule_p[i], 2)}\n"
+        readable += f"Coverage of the else rule: {self.else_rule_coverage}\n"
+
+        return readable
+
+class PredictUsingRuleset:
+    def __init__(self, folder_name):
+
+        ruleset_info = dill.load(open(f"{folder_name}/ruleset_info.pkl", "rb"))
+
+        self.num_class = ruleset_info["num_class"]
+        self.target = ruleset_info["target"]
+        self.uncovered_bool = ruleset_info["uncovered_bool"]
+        self.rules = []
+
+        for file in os.listdir(folder_name):
+            if file.startswith('rule_'):
+                rule = dill.load(open(f"{folder_name}/{file}", "rb"))
+                self.rules.append(rule)
 
     def predict_ruleset(self, X_test):
         """ This function computes the local prediction using a ruleset, given a test set.
@@ -579,9 +642,9 @@ class Ruleset:
             Probability distributions for the prediction
         """
         if type(X_test) != np.ndarray:
-            X_test = X_test.todense()
+            X_test = np.array(X_test.todense())
 
-        prob_predicted = np.zeros((len(X_test), self.data_info.num_class), dtype=float)
+        prob_predicted = np.zeros((len(X_test), self.num_class), dtype=float)
         cover_matrix = np.zeros((len(X_test), len(self.rules) + 1), dtype=bool)
 
         test_uncovered_bool = np.ones(len(X_test), dtype=bool)
@@ -619,49 +682,20 @@ class Ruleset:
 
         unique_id_prob_dir = {}
         for z, t in unique_id_dir.items():
-            bool_model = np.zeros(len(self.data_info.target), dtype=bool)
+            bool_model = np.zeros(len(self.target), dtype=bool)
             for i_tt, tt in enumerate(t):
                 if tt == 1:
                     if i_tt == len(self.rules):
                         bool_model = self.uncovered_bool
                     else:
                         bool_model = np.bitwise_or(bool_model, self.rules[i_tt].bool_array)
-            unique_id_prob_dir[z] = utils_calculating_cl.calc_probs(self.data_info.target[bool_model],
-                                            self.data_info.num_class)
+            unique_id_prob_dir[z] = utils_calculating_cl.calc_probs(self.target[bool_model],
+                                            self.num_class)
 
         for i in range(len(prob_predicted)):
             prob_predicted[i] = unique_id_prob_dir[unique_id[i]]
 
         return prob_predicted
-
-
-    def __str__(self):
-        """ This function prints a ruleset in a readable way.
-    
-        Parameters
-        ---
-        ruleset : RuleSet
-            The ruleset to be printed.
-        
-        Returns
-        ---
-        None
-        """
-        readable = ""
-        label_names = self.data_info.alg_config.label_names
-        for rule in self.rules:
-            readable += rule.to_string(verbose=True)
-            readable += "\n"
-        readable += "If none of above,\n"
-        readable += "Then:\n"
-        if len(self.else_rule_p) > 5:
-            readable += f"Highest probability is {max(self.else_rule_p)} for outcome {label_names[np.argmax(self.else_rule_p)]}"
-        else:
-            for i in range(len(label_names)):
-                readable += f"Probability of {label_names[i]} is {round(self.else_rule_p[i], 2)}\n"
-        readable += f"Coverage of the else rule: {self.else_rule_coverage}\n"
-
-        return readable
 
 
 def store_grow_info(excl_bi_array, incl_bi_array, icol, cut, cut_option, excl_mdl_gain, incl_mdl_gain,
@@ -1034,7 +1068,10 @@ class Rule:
         new_else_bool[ruleset_info.uncovered_indices] = True
         new_else_bool[self.indices_excl[excl_bi_array]] = False
         new_else_coverage = np.count_nonzero(new_else_bool)
-        new_else_p = self.calc_probs(data_info.target[new_else_bool])
+        if data_info.alg_config.force_else_50_50:
+            new_else_p = np.array([1./data_info.num_class] * data_info.num_class)
+        else:
+            new_else_p = self.calc_probs(data_info.target[new_else_bool])
 
         new_else_negloglike = -new_else_coverage * np.sum(np.log2(new_else_p[new_else_p != 0]) * new_else_p[new_else_p != 0])
         new_else_regret = nml_regret.regret(new_else_coverage, data_info.num_class)
@@ -1068,7 +1105,10 @@ class Rule:
         else_bool = np.array(ruleset_info.uncovered_bool)
         else_bool[self.indices_excl[bool]] = False
         coverage_else = np.count_nonzero(else_bool)
-        p_else = utils_calculating_cl.calc_probs(data_info.target[else_bool], data_info.num_class)
+        if data_info.alg_config.force_else_50_50:
+            p_else = np.array([1./data_info.num_class] * data_info.num_class)
+        else:
+            p_else = utils_calculating_cl.calc_probs(data_info.target[else_bool], data_info.num_class)
         negloglike_else = -coverage_else * np.sum(np.log2(p_else[p_else != 0]) * p_else[p_else != 0])
 
         regret_else, regret_rule = nml_regret.regret(coverage_else, self.num_class), nml_regret.regret(coverage_rule, self.num_class)

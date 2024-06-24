@@ -13,10 +13,9 @@ from sklearn.model_selection import StratifiedKFold
 
 import utils_dataprep
 import TURS
-import utils_dataprep
 
 np.seterr(all='raise')
-print("Running TURS with multirocessed rules")
+print("Running TURS with multiprocessed rules")
 
 h = hpy()
 make_call_graph = False
@@ -69,12 +68,14 @@ for fold in range(5):
         workers=16,
         log_learning_process=3 if first_run else 0,
         log_folder_name=datetime.now().strftime("%Y%m%d_%H%M%s") + "_" + data_name,
+        model_folder_name="test",
         dataset_name=None,
         feature_names=feature_names,
         which_features=None,
         random_seed=None,
         label_names=class_labels,
-        probability_threshold=True,
+        probability_threshold=False,
+        force_else_50_50=False,
         validity_check="either"
     )
 

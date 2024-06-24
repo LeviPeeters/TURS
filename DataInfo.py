@@ -26,10 +26,12 @@ class DataInfo:
                 chunksize=1,
                 workers=-1,
                 log_learning_process=1,
+                model_folder_name=None,
                 dataset_name=None,
                 feature_names=["X" + str(i) for i in range(X.shape[1])],
                 label_names=np.unique(y),
                 probability_threshold=False,
+                force_else_50_50=False,
                 validity_check="either"
             )
         else:
