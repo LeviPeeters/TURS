@@ -19,17 +19,21 @@ class TURS():
                     workers: int = -1,
                     log_learning_process: int = 1,
                     log_folder_name: str = None,
+                    model_folder_name: str = None,
                     dataset_name: str = None,
                     feature_names: list = None,
                     label_names: list = None,
                     which_features: list = None,
                     random_seed: int = None,
                     probability_threshold: bool = False,
+                    force_else_50_50: bool = False,
                     validity_check: str = "either"
                  ) -> None:
         
         if log_folder_name is None:
             log_folder_name = f"{datetime.now().strftime('%Y%m%d_%H%M')}"
+        if model_folder_name is None:
+            print("Model folder name is not provided. Model will not be saved.")
         
         if workers > os.cpu_count():
             workers = os.cpu_count()
@@ -51,12 +55,14 @@ class TURS():
             workers=workers,
             log_learning_process=log_learning_process,
             log_folder_name=log_folder_name,
+            model_folder_name=model_folder_name,
             dataset_name=dataset_name,
             feature_names=feature_names,
             label_names=label_names,
             which_features=which_features,
             random_seed=random_seed,
             probability_threshold=probability_threshold,
+            force_else_50_50=force_else_50_50,
             validity_check=validity_check
         )
 
@@ -85,7 +91,9 @@ class TURS():
             data_info
         )
 
-        self.ruleset.fit(max_iter=1000)
+        folder_name = self.ruleset.fit(max_iter=1000)
+        if folder_name is not None:
+            self.alg_config = self.alg_config._replace(model_folder_name=folder_name)
     
         return self.ruleset
 
@@ -103,5 +111,7 @@ class TURS():
 
     
     def predict_probabilities(self, X_test):
-        return self.ruleset.predict_ruleset(X_test)
+        "Predict probabilities using the ruleset saved in the internal model folder"
+        prediction_model = Ruleset.PredictUsingRuleset(self.alg_config.model_folder_name)
+        return prediction_model.predict_ruleset(X_test)
 
