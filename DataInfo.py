@@ -126,14 +126,15 @@ class DataInfo:
                 i += 1
             self.logger.info("\n\n")
 
-            # For logging information about the growth process to a CSV file
-            handler3 = logging.FileHandler(filename=filename+"_growth.csv", encoding='utf-8', mode='w')
-            handler3.setFormatter(logging.Formatter('%(message)s'))
-            self.growth_logger: logging.RootLogger
-            self.growth_logger = logging.getLogger("growth_logger")
-            self.growth_logger.addHandler(handler3)
-            self.growth_logger.setLevel(logging.INFO)
-            self.growth_logger.info("rule,iteration,coverage_incl,coverage_excl,mdl_gain_incl,mdl_gain_excl")
+            if self.log_learning_process > 1:
+                # For logging information about the growth process to a CSV file
+                handler3 = logging.FileHandler(filename=filename+"_growth.csv", encoding='utf-8', mode='w')
+                handler3.setFormatter(logging.Formatter('%(message)s'))
+                self.growth_logger: logging.RootLogger
+                self.growth_logger = logging.getLogger("growth_logger")
+                self.growth_logger.addHandler(handler3)
+                self.growth_logger.setLevel(logging.INFO)
+                self.growth_logger.info("rule,iteration,coverage_incl,coverage_excl,mdl_gain_incl,mdl_gain_excl")
 
             self.current_rule = 0
             self.current_iteration = 0

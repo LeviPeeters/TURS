@@ -267,6 +267,7 @@ class Ruleset:
         if self.data_info.log_learning_process > 0:
             self.data_info.logger.info(f"Finished learning process at {datetime.now().strftime('%Y-%m-%d_%H-%M')}")
             self.data_info.logger.info(f"Total runtime: {time.time() - self.data_info.start_time}")
+            self.data_info.logger.info(f"Number of rules in the ruleset: {len(self.rules)}")
             self.data_info.logger.info(f"Final ruleset is: ")
             self.data_info.logger.info(str(self))
             self.data_info.logger.info("\n")
@@ -626,7 +627,10 @@ class PredictUsingRuleset:
                 rule = dill.load(open(f"{folder_name}/{file}", "rb"))
                 self.rules.append(rule)
 
-    def predict_ruleset(self, X_test):
+    def predict(self, X_test):
+        return np.argmax(self.predict_proba(X_test), axis=1)
+
+    def predict_proba(self, X_test):
         """ This function computes the local prediction using a ruleset, given a test set.
         
         Parameters
@@ -913,9 +917,8 @@ class Rule:
         None
         """
         s2 = time.time()
-        if data_info.alg_config.log_learning_process > 0:
+        if data_info.alg_config.log_learning_process > 1:
             data_info.growth_logger.info(f"{data_info.current_rule},{data_info.current_iteration},{self.coverage},{self.coverage_excl},{self.mdl_gain},{self.mdl_gain_excl}")
-        if data_info.alg_config.log_learning_process > 1:    
             data_info.logger.info(str(self))
         
         grow_info_beam = Beam.DiverseCovBeam(width=data_info.beam_width)
