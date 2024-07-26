@@ -1,6 +1,7 @@
 # Experiment results
 exp_uci*
 logs/*
+models/
 
 # graphs and figures
 *.png
