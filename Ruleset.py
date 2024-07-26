@@ -92,6 +92,9 @@ def setup_worker(data_info_orig, ruleset_info_orig, modelling_groups_orig):
     data_info = data_info_orig
     modelling_groups = modelling_groups_orig
 
+def expand_rule(candidate, incl_or_excl, results):
+    candidate.grow(results, incl_or_excl)
+
 class Ruleset:
     def __init__(self,
                  data_info_orig: DataInfo.DataInfo,
@@ -267,6 +270,7 @@ class Ruleset:
         if self.data_info.log_learning_process > 0:
             self.data_info.logger.info(f"Finished learning process at {datetime.now().strftime('%Y-%m-%d_%H-%M')}")
             self.data_info.logger.info(f"Total runtime: {time.time() - self.data_info.start_time}")
+            self.data_info.logger.info(f"Number of rules in the ruleset: {len(self.rules)}")
             self.data_info.logger.info(f"Final ruleset is: ")
             self.data_info.logger.info(str(self))
             self.data_info.logger.info("\n")
@@ -416,7 +420,7 @@ class Ruleset:
                                     uncovered_indices=self.uncovered_indices,
                                     allrules_regret=self.allrules_regret)
             results = mp.Manager().list()
-
+            # print(self.data_info.alg_config.workers)
             if self.data_info.alg_config.workers == -1:
                 # No multiprocessing 
                 pool = mp.Pool(mp.cpu_count(), initializer=setup_worker, initargs=(self.data_info, ruleset_info, self.modelling_groups))
@@ -425,19 +429,23 @@ class Ruleset:
                     candidate[0].grow(results, candidate[1])
             else:
                 # Multiprocessing using the specified number of workers
-                # pool = mp.Pool(self.data_info.alg_config.workers,  initializer=setup_worker, initargs=(self.data_info, ruleset_info, self.modelling_groups))
+                pool = mp.Pool(self.data_info.alg_config.workers,  initializer=setup_worker, initargs=(self.data_info, ruleset_info, self.modelling_groups))
             
                 s = time.time()
-                # res = pool.starmap_async(expand_rule, [(cand[0], cand[1], results) for i, cand in enumerate(candidates)])
-                processes = []
-                setup_worker(self.data_info, ruleset_info, self.modelling_groups)
-                for candidate in candidates:
-                    process = mp.Process(target=candidate[0].grow, args=(results, candidate[1]))
-                    processes.append(process)
-                    process.start()
+                                                    
+                res = pool.starmap_async(expand_rule, [(cand[0], cand[1], results) for i, cand in enumerate(candidates)])
+                res.wait()
+                pool.close()
                 
-                for process in processes:
-                    process.join()
+                # processes = []
+                # setup_worker(self.data_info, ruleset_info, self.modelling_groups)
+                # for candidate in candidates:
+                #     process = mp.Process(target=candidate[0].grow, args=(results, candidate[1]))
+                #     processes.append(process)
+                #     process.start()
+                
+                # for process in processes:
+                #     process.join()
 
                 if self.data_info.log_learning_process > 2:
                     self.data_info.time_logger.info(f"0,{time.time() - s},expand all rules")
@@ -626,7 +634,10 @@ class PredictUsingRuleset:
                 rule = dill.load(open(f"{folder_name}/{file}", "rb"))
                 self.rules.append(rule)
 
-    def predict_ruleset(self, X_test):
+    def predict(self, X_test):
+        return np.argmax(self.predict_proba(X_test), axis=1)
+
+    def predict_proba(self, X_test):
         """ This function computes the local prediction using a ruleset, given a test set.
         
         Parameters
@@ -913,9 +924,8 @@ class Rule:
         None
         """
         s2 = time.time()
-        if data_info.alg_config.log_learning_process > 0:
+        if data_info.alg_config.log_learning_process > 1:
             data_info.growth_logger.info(f"{data_info.current_rule},{data_info.current_iteration},{self.coverage},{self.coverage_excl},{self.mdl_gain},{self.mdl_gain_excl}")
-        if data_info.alg_config.log_learning_process > 1:    
             data_info.logger.info(str(self))
         
         grow_info_beam = Beam.DiverseCovBeam(width=data_info.beam_width)

@@ -1,7 +1,11 @@
 # Experiment results
 exp_uci*
 logs/*
+<<<<<<< HEAD
 models/
+=======
+models/*
+>>>>>>> parallel_rules
 
 # graphs and figures
 *.png
