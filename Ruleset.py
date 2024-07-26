@@ -276,7 +276,7 @@ class Ruleset:
                 utils.time_report_boxplot(f"./logs/{self.data_info.alg_config.log_folder_name}")
 
         if self.data_info.alg_config.model_folder_name is not None:
-            folder_name = self.save_ruleset(f"./models/{self.data_info.alg_config.model_folder_name}")
+            folder_name = self.save_ruleset(f"{self.data_info.alg_config.model_folder_name}")
             print(f"Ruleset saved in {folder_name}")
             return folder_name
 
