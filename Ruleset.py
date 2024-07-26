@@ -92,6 +92,9 @@ def setup_worker(data_info_orig, ruleset_info_orig, modelling_groups_orig):
     data_info = data_info_orig
     modelling_groups = modelling_groups_orig
 
+def expand_rule(candidate, incl_or_excl, results):
+    candidate.grow(results, incl_or_excl)
+
 class Ruleset:
     def __init__(self,
                  data_info_orig: DataInfo.DataInfo,
@@ -417,7 +420,7 @@ class Ruleset:
                                     uncovered_indices=self.uncovered_indices,
                                     allrules_regret=self.allrules_regret)
             results = mp.Manager().list()
-
+            # print(self.data_info.alg_config.workers)
             if self.data_info.alg_config.workers == -1:
                 # No multiprocessing 
                 pool = mp.Pool(mp.cpu_count(), initializer=setup_worker, initargs=(self.data_info, ruleset_info, self.modelling_groups))
@@ -426,19 +429,23 @@ class Ruleset:
                     candidate[0].grow(results, candidate[1])
             else:
                 # Multiprocessing using the specified number of workers
-                # pool = mp.Pool(self.data_info.alg_config.workers,  initializer=setup_worker, initargs=(self.data_info, ruleset_info, self.modelling_groups))
+                pool = mp.Pool(self.data_info.alg_config.workers,  initializer=setup_worker, initargs=(self.data_info, ruleset_info, self.modelling_groups))
             
                 s = time.time()
-                # res = pool.starmap_async(expand_rule, [(cand[0], cand[1], results) for i, cand in enumerate(candidates)])
-                processes = []
-                setup_worker(self.data_info, ruleset_info, self.modelling_groups)
-                for candidate in candidates:
-                    process = mp.Process(target=candidate[0].grow, args=(results, candidate[1]))
-                    processes.append(process)
-                    process.start()
+                                                    
+                res = pool.starmap_async(expand_rule, [(cand[0], cand[1], results) for i, cand in enumerate(candidates)])
+                res.wait()
+                pool.close()
                 
-                for process in processes:
-                    process.join()
+                # processes = []
+                # setup_worker(self.data_info, ruleset_info, self.modelling_groups)
+                # for candidate in candidates:
+                #     process = mp.Process(target=candidate[0].grow, args=(results, candidate[1]))
+                #     processes.append(process)
+                #     process.start()
+                
+                # for process in processes:
+                #     process.join()
 
                 if self.data_info.log_learning_process > 2:
                     self.data_info.time_logger.info(f"0,{time.time() - s},expand all rules")
