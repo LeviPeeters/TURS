@@ -4,9 +4,10 @@ AlgConfig = namedtuple('AlgConfig', [
             "beam_width",
             "num_candidate_cuts", "max_num_rules", "max_grow_iter",
             "num_class_as_given", "chunksize", "workers",
-            "log_learning_process", "log_folder_name",
+            "log_learning_process", "log_folder_name", "model_folder_name",
             "dataset_name", "feature_names", "which_features",
-            "random_seed", "label_names",
+            "random_seed", "label_names", "probability_threshold",
+            "force_else_50_50",
             "validity_check"
         ])
 

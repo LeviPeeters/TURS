@@ -19,11 +19,14 @@ class TURS():
                     workers: int = -1,
                     log_learning_process: int = 1,
                     log_folder_name: str = None,
+                    model_folder_name: str = None, # not implemented for parallel literals
                     dataset_name: str = None,
                     feature_names: list = None,
                     label_names: list = None,
                     which_features: list = None,
                     random_seed: int = None,
+                    probability_threshold: bool = False, # not implemented for parallel literals
+                    force_else_50_50: bool = False, # not implemented for parallel literals
                     validity_check: str = "either"
                  ) -> None:
         
@@ -44,11 +47,14 @@ class TURS():
             workers=workers,
             log_learning_process=log_learning_process,
             log_folder_name=log_folder_name,
+            model_folder_name=model_folder_name,
             dataset_name=dataset_name,
             feature_names=feature_names,
             label_names=label_names,
             which_features=which_features,
             random_seed=random_seed,
+            probability_threshold=probability_threshold,
+            force_else_50_50=force_else_50_50,
             validity_check=validity_check
         )
 
