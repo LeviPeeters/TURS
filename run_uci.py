@@ -66,8 +66,8 @@ for fold in range(5):
         num_class_as_given=None,
         beam_width=10,
         chunksize=1,
-        workers=1,
-        log_learning_process=1 if first_run else 0,
+        workers=-1,
+        log_learning_process=3 if first_run else 0,
         log_folder_name=datetime.now().strftime("%Y%m%d_%H%M%s") + "_" + data_name,
         model_folder_name="test",
         dataset_name=None,
@@ -85,10 +85,10 @@ for fold in range(5):
     end_time = time.time()
     times.append(end_time - start_time)
 
-    if first_run:
-        model = PredictUsingRuleset("models/test")
-        y_pred_prob = model.predict_proba(X_test)
-        # print("y_pred_prob", y_pred_prob)
+    # if first_run:
+    #     model = PredictUsingRuleset("models/test")
+    #     y_pred_prob = model.predict_proba(X_test)
+    #     # print("y_pred_prob", y_pred_prob)
 
     first_run = False
 

@@ -423,7 +423,7 @@ class Ruleset:
             # print(self.data_info.alg_config.workers)
             if self.data_info.alg_config.workers == -1:
                 # No multiprocessing 
-                pool = mp.Pool(mp.cpu_count(), initializer=setup_worker, initargs=(self.data_info, ruleset_info, self.modelling_groups))
+                # pool = mp.Pool(mp.cpu_count(), initializer=setup_worker, initargs=(self.data_info, ruleset_info, self.modelling_groups))
                 setup_worker(self.data_info, ruleset_info, self.modelling_groups)
                 for candidate in candidates:
                     candidate[0].grow(results, candidate[1])
@@ -472,9 +472,6 @@ class Ruleset:
                 final_beam_incl.update(info, info[f"normalized_gain_incl"])       
             for info in final_info_excl:
                 final_beam_excl.update(info, info[f"normalized_gain_excl"])
-
-            
-
 
             # If the beams are empty, stop the search
             if len(final_beam_incl.gains) == 0 and len(final_beam_excl.gains) == 0:
