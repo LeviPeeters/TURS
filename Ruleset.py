@@ -423,7 +423,6 @@ class Ruleset:
             # print(self.data_info.alg_config.workers)
             if self.data_info.alg_config.workers == -1:
                 # No multiprocessing 
-                # pool = mp.Pool(mp.cpu_count(), initializer=setup_worker, initargs=(self.data_info, ruleset_info, self.modelling_groups))
                 setup_worker(self.data_info, ruleset_info, self.modelling_groups)
                 for candidate in candidates:
                     candidate[0].grow(results, candidate[1])
