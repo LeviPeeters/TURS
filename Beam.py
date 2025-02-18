@@ -1,5 +1,4 @@
 import numpy as np
-import time
 
 class GrowInfoBeam:
     """
@@ -30,17 +29,18 @@ class GrowInfoBeam:
         gain : float
             Gain of the growth step
         """
+        
         info_coverage = np.count_nonzero(info["incl_bi_array"])
         skip_flag = False
 
         # Check if a growth step with the same coverage is already in the beam
-        # TODO: Wouldn't this still allow steps with very similar coverage to be added?
         if info_coverage in self.coverage_list:
             which_equal = self.coverage_list.index(info_coverage)
             bi_array_in_list = self.infos[which_equal]["incl_bi_array"]
             bi_array_input = info["incl_bi_array"]
             if np.array_equal(bi_array_in_list, bi_array_input):
                 skip_flag = True
+            
 
         if skip_flag is False:
             # If there are less steps in the beam than the width, add the new step

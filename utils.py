@@ -32,6 +32,18 @@ class ElapsedTimeFormatter(logging.Formatter):
         self.start_time = time.time()
         return f"{elapsed} - {record.getMessage()}"
 
+class RegularFormatter(logging.Formatter):
+    """
+    A custom formatter for logging that includes the elapsed time between log entries.
+    """
+
+    def __init__(self):
+        pass
+
+    def format(self, record):
+        timestamp = time.strftime('%H:%M:%S', time.gmtime(time.time()))
+        return f"{timestamp} - {record.getMessage()}"
+
 def time_report(log_folder_path):
     # Read the csv file into a pandas dataframe
     df = pd.read_csv(f"{log_folder_path}/log_time.csv")
@@ -46,9 +58,10 @@ def time_report_boxplot(log_folder_path):
     plt.figure(figsize=(10, 5))
     for i, name in enumerate(df["Function"].unique()):
         to_plot = df.loc[df["Function"] == name, "Time"].values
-        # Normalize the time distribution
-        to_plot = (to_plot - to_plot.min()) / (to_plot.max() - to_plot.min())
-        plt.boxplot(to_plot, labels=[name], positions=[i], vert=False)
+        if len(to_plot) > 1:
+            # Normalize the time distribution
+            to_plot = (to_plot - to_plot.min()) / (to_plot.max() - to_plot.min())
+            plt.boxplot(to_plot, labels=[name], positions=[i], vert=False)
     
     plt.tight_layout()
     plt.title("Normalized time distribution per function")

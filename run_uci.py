@@ -1,10 +1,5 @@
 import sys
-import os
-import pdb
-
 import numpy as np
-import pandas as pd
-import copy
 import time
 from datetime import datetime
 from guppy import hpy
@@ -13,10 +8,9 @@ from sklearn.model_selection import StratifiedKFold
 
 import utils_dataprep
 import TURS
-import utils_dataprep
 
 np.seterr(all='raise')
-print("Running TURS with multithreading")
+print("Running TURS with multiprocessed rules")
 
 h = hpy()
 make_call_graph = False
@@ -65,13 +59,18 @@ for fold in range(5):
         max_grow_iter=500,
         num_class_as_given=None,
         beam_width=10,
+        chunksize=1,
+        workers=-1,
         log_learning_process=3 if first_run else 0,
         log_folder_name=datetime.now().strftime("%Y%m%d_%H%M%s") + "_" + data_name,
+        model_folder_name="test",
         dataset_name=None,
         feature_names=feature_names,
         which_features=None,
         random_seed=None,
         label_names=class_labels,
+        probability_threshold=False,
+        force_else_50_50=False,
         validity_check="either"
     )
 
@@ -79,6 +78,11 @@ for fold in range(5):
 
     end_time = time.time()
     times.append(end_time - start_time)
+
+    # if first_run:
+    #     model = PredictUsingRuleset("models/test")
+    #     y_pred_prob = model.predict_proba(X_test)
+    #     # print("y_pred_prob", y_pred_prob)
 
     first_run = False
 

@@ -1,5 +1,4 @@
 # Class DataInfo which stores metadata about the dataset
-# Lincen's code includes a number of methods to get candidate cuts, but only this one is used
 
 import numpy as np
 import os
@@ -10,6 +9,7 @@ import time
 
 import utils_namedtuple
 import utils_calculating_cl
+import utils_modelencoding
 import utils
 
 class DataInfo:
@@ -22,10 +22,15 @@ class DataInfo:
                 max_grow_iter=200, 
                 num_class_as_given=None,
                 beam_width=beam_width,
+                chunksize=1,
+                workers=-1,
                 log_learning_process=1,
+                model_folder_name=None,
                 dataset_name=None,
                 feature_names=["X" + str(i) for i in range(X.shape[1])],
                 label_names=np.unique(y),
+                probability_threshold=False,
+                force_else_50_50=False,
                 validity_check="either"
             )
         else:
@@ -51,11 +56,12 @@ class DataInfo:
 
         # Make a dictionary of categorical features and their possible values
         self.categorical_features = {}
+        self.numerical_features = []
         for name in self.feature_names:
             try:
                 feature, value = name.split("_")
             except ValueError:
-                pass
+                self.numerical_features.append(name)
             else:
                 if feature not in self.categorical_features:
                     self.categorical_features[feature] = [value]
@@ -73,8 +79,11 @@ class DataInfo:
         # Get candidate cut points for each numerical feature
         self.candidate_cuts = self.candidate_cuts_quantile_midpoints(self.num_candidate_cuts)
 
-        # TODO: what does this do
         self.cached_number_of_rules_for_cl_model = self.alg_config.max_grow_iter
+        self.cached_cl_model = {}
+        self.max_num_rules = 100  # an upper bound for the number of rules, just for cl_model caching
+        self.data_ncol_for_encoding = self.ncol
+        self.cache_cl_model(self.ncol, self.max_grow_iter, self.candidate_cuts)
         
         # Set up logging files
         if self.alg_config.log_learning_process > 0:
@@ -88,7 +97,7 @@ class DataInfo:
 
             # Set up a text logger
             handler = logging.FileHandler(filename=filename+".txt", encoding='utf-8', mode='w')
-            handler.setFormatter(utils.ElapsedTimeFormatter())
+            handler.setFormatter(utils.RegularFormatter())
             self.logger: logging.RootLogger
             self.logger = logging.getLogger("text_logger")
             self.logger.addHandler(handler)
@@ -103,14 +112,25 @@ class DataInfo:
             self.logger.info("Number of features: " + str(self.ncol))
             self.logger.info("\n")
 
-            # For logging information about the growth process to a CSV file
-            handler3 = logging.FileHandler(filename=filename+"_growth.csv", encoding='utf-8', mode='w')
-            handler3.setFormatter(logging.Formatter('%(message)s'))
-            self.growth_logger: logging.RootLogger
-            self.growth_logger = logging.getLogger("growth_logger")
-            self.growth_logger.addHandler(handler3)
-            self.growth_logger.setLevel(logging.INFO)
-            self.growth_logger.info("rule,iteration,coverage_incl,coverage_excl,mdl_gain_incl,mdl_gain_excl")
+            self.logger.info("Features")
+            i = 1
+            for key, value in self.categorical_features.items():
+                self.logger.info(f"Feature {i}: {key} with {len(value)} values")
+                i += 1
+            for feature in self.numerical_features:
+                self.logger.info(f"Feature {i}: {feature}, numerical")
+                i += 1
+            self.logger.info("\n\n")
+
+            if self.log_learning_process > 1:
+                # For logging information about the growth process to a CSV file
+                handler3 = logging.FileHandler(filename=filename+"_growth.csv", encoding='utf-8', mode='w')
+                handler3.setFormatter(logging.Formatter('%(message)s'))
+                self.growth_logger: logging.RootLogger
+                self.growth_logger = logging.getLogger("growth_logger")
+                self.growth_logger.addHandler(handler3)
+                self.growth_logger.setLevel(logging.INFO)
+                self.growth_logger.info("rule,iteration,coverage_incl,coverage_excl,mdl_gain_incl,mdl_gain_excl")
 
             self.current_rule = 0
             self.current_iteration = 0
@@ -125,6 +145,59 @@ class DataInfo:
                 self.time_logger.setLevel(logging.INFO)
                 self.time_logger.info("Thread,Time,Function")
     
+    def cache_cl_model(self, data_ncol, max_rule_length, candidate_cuts):
+        """ Precompute certain code length values we'll need often
+        For number of variables, number of rules, number of cuts and selection of variables
+
+        Parameters
+        ---
+        data_ncol : int
+            Number of variables
+        max_rule_length : int
+            Maximum number of literals in a rule
+        candidate_cuts : Dict
+            Candidate cut points for each variable
+        
+        Returns
+        ---
+        None
+        
+        """ 
+        # Code Length contributed by the number of variables in a rule (one per literal)
+        l_number_of_variables = [utils_modelencoding.universal_code_integers(i) for i in range(max(data_ncol-1, max_rule_length))]
+        
+        # Code Length contributed to specify which variables are used in a rule
+        l_which_variables = utils_modelencoding.log2comb(data_ncol, np.arange(max(data_ncol-1, max_rule_length)))
+
+        # Code Length contributed by the number of rules in the ruleset
+        l_number_of_rules = [utils_modelencoding.universal_code_integers(i) for i in range(self.max_num_rules)]
+
+        # Code length contributed by a cut is dependent on the number of candidate cuts, so make an array of those
+        candidate_cuts_length = np.array([len(candi) for candi in candidate_cuts.values()], dtype=float)
+        only_one_candi_selector = (candidate_cuts_length == 1)
+        zero_candi_selector = (candidate_cuts_length == 0)
+
+        # Code length contributed by the cut point for a literal, if there is one cut
+        l_one_cut = np.zeros(len(candidate_cuts_length), dtype=float)
+        l_one_cut[~zero_candi_selector] = np.log2(candidate_cuts_length[~zero_candi_selector]) + 1 + 1  # 1 bit for LEFT/RIGHT, and 1 bit for one/two cuts
+        l_one_cut[only_one_candi_selector] = l_one_cut[only_one_candi_selector] - 1
+
+        # Code length contributed by the cut point for a literal, if there are two cuts (interval)
+        l_two_cut = np.zeros(len(candidate_cuts_length))
+        l_two_cut[only_one_candi_selector] = np.nan
+        two_candi_selector = (candidate_cuts_length > 1)
+
+        l_two_cut[two_candi_selector] = np.log2(candidate_cuts_length[two_candi_selector]) + \
+                                        np.log2(candidate_cuts_length[two_candi_selector] - 1) - np.log2(2) \
+                                        + 1  # the last 1 bit is for encoding one/two cuts
+        
+        # Store precomputed values
+        l_cut = np.array([l_one_cut, l_two_cut])
+        self.cached_cl_model["l_number_of_variables"] = l_number_of_variables
+        self.cached_cl_model["l_cut"] = l_cut
+        self.cached_cl_model["l_which_variables"] = l_which_variables
+        self.cached_cl_model["l_number_of_rules"] = l_number_of_rules
+
     def candidate_cuts_quantile_midpoints(self, num_candidate_cuts):
         """ Calculate the candidate cuts for each numerical feature, using the quantile midpoints method.
         
@@ -148,8 +221,7 @@ class DataInfo:
         for i, feature in enumerate(self.features.T):
             # We make the feature dense to avoid issues with sparse matrix indexing
             unique_feature = np.unique(feature.todense())
-            # print(unique_feature)
-            # breakpoint()
+
             if len(unique_feature) <= 1:
                 # This can happen because of cross-validation
                 candidate_cut_this_dimension = np.array([], dtype=float)

@@ -23,7 +23,6 @@ class ModellingGroup:
 
     def evaluate_rule_with_no_updating(self, indices):
         """ Approximately evaluate the neg_log_likelihood when growing the rule
-        TODO: unclear what the nonRule part does
 
         Parameters
         ---
@@ -33,7 +32,6 @@ class ModellingGroup:
         Returns
         ---
         : float
-            TODO
         """
         rule_cover = np.zeros(self.data_info.nrow, dtype=bool)
         rule_cover[indices] = True
@@ -76,7 +74,6 @@ class ModellingGroup:
 
     def evaluate_rule(self, rule, update_rule_index):
         """ calculate the negloglikelihood for the rule_and_mg and nonRule_and_mg;
-        TODO: unclear what the nonRule part does
         
         Parameters
         ---
@@ -88,7 +85,6 @@ class ModellingGroup:
         Returns
         ---
         : float
-            TODO
         """
         rule_and_mg_covering_bool = np.bitwise_and(self.bool_cover, rule.bool_array)
         rule_and_mg_covering_coverage = np.count_nonzero(rule_and_mg_covering_bool)
