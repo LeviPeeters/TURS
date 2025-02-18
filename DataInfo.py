@@ -1,5 +1,4 @@
 # Class DataInfo which stores metadata about the dataset
-# Lincen's code includes a number of methods to get candidate cuts, but only this one is used
 
 import numpy as np
 import os
@@ -80,9 +79,7 @@ class DataInfo:
         # Get candidate cut points for each numerical feature
         self.candidate_cuts = self.candidate_cuts_quantile_midpoints(self.num_candidate_cuts)
 
-        # TODO: what does this do
         self.cached_number_of_rules_for_cl_model = self.alg_config.max_grow_iter
-
         self.cached_cl_model = {}
         self.max_num_rules = 100  # an upper bound for the number of rules, just for cl_model caching
         self.data_ncol_for_encoding = self.ncol
@@ -100,7 +97,6 @@ class DataInfo:
 
             # Set up a text logger
             handler = logging.FileHandler(filename=filename+".txt", encoding='utf-8', mode='w')
-            # handler.setFormatter(utils.ElapsedTimeFormatter())
             handler.setFormatter(utils.RegularFormatter())
             self.logger: logging.RootLogger
             self.logger = logging.getLogger("text_logger")
@@ -191,7 +187,6 @@ class DataInfo:
         l_two_cut[only_one_candi_selector] = np.nan
         two_candi_selector = (candidate_cuts_length > 1)
 
-        # TODO: reconsider the l_two_cut from the perspective of hypothesis testing
         l_two_cut[two_candi_selector] = np.log2(candidate_cuts_length[two_candi_selector]) + \
                                         np.log2(candidate_cuts_length[two_candi_selector] - 1) - np.log2(2) \
                                         + 1  # the last 1 bit is for encoding one/two cuts
@@ -226,8 +221,7 @@ class DataInfo:
         for i, feature in enumerate(self.features.T):
             # We make the feature dense to avoid issues with sparse matrix indexing
             unique_feature = np.unique(feature.todense())
-            # print(unique_feature)
-            # breakpoint()
+
             if len(unique_feature) <= 1:
                 # This can happen because of cross-validation
                 candidate_cut_this_dimension = np.array([], dtype=float)

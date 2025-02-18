@@ -1,5 +1,3 @@
-# API
-
 from datetime import datetime
 
 import DataInfo

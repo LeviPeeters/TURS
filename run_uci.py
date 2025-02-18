@@ -1,10 +1,5 @@
 import sys
-import os
-import pdb
-
 import numpy as np
-import pandas as pd
-import copy
 import time
 from datetime import datetime
 from guppy import hpy
@@ -13,7 +8,6 @@ from sklearn.model_selection import StratifiedKFold
 
 import utils_dataprep
 import TURS
-from Ruleset import PredictUsingRuleset
 
 np.seterr(all='raise')
 print("Running TURS with multiprocessed rules")

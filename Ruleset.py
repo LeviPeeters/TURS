@@ -133,8 +133,6 @@ class Ruleset:
 
         self.allrules_cl_data = 0
 
-        
-
         if constraints is None:
             self.constraints = {}
         else:
@@ -255,7 +253,6 @@ class Ruleset:
             # Grow a rule
             rule_to_add = self.search_next_rule(k_consecutively=5)
 
-            # 
             if rule_to_add.incl_gain_per_excl_coverage > 0:
                 self.add_rule(rule_to_add)
                 total_cl.append(self.total_cl)
@@ -405,9 +402,6 @@ class Ruleset:
             # Create a list of candidates for the next iteration
             candidates = []
             for rule in rules_for_next_iter:
-                # with dill.detect.trace("dill_trace.log", mode='w'):
-                #     dill.dumps(rule)
-                # breakpoint()
                 for incl_or_excl in ["incl", "excl"]:
                     candidates.append((rule, incl_or_excl))  
                                 
@@ -420,7 +414,6 @@ class Ruleset:
                                     uncovered_indices=self.uncovered_indices,
                                     allrules_regret=self.allrules_regret)
             results = mp.Manager().list()
-            # print(self.data_info.alg_config.workers)
             if self.data_info.alg_config.workers == -1:
                 # No multiprocessing 
                 setup_worker(self.data_info, ruleset_info, self.modelling_groups)
@@ -435,16 +428,6 @@ class Ruleset:
                 res = pool.starmap_async(expand_rule, [(cand[0], cand[1], results) for i, cand in enumerate(candidates)])
                 res.wait()
                 pool.close()
-                
-                # processes = []
-                # setup_worker(self.data_info, ruleset_info, self.modelling_groups)
-                # for candidate in candidates:
-                #     process = mp.Process(target=candidate[0].grow, args=(results, candidate[1]))
-                #     processes.append(process)
-                #     process.start()
-                
-                # for process in processes:
-                #     process.join()
 
                 if self.data_info.log_learning_process > 2:
                     self.data_info.time_logger.info(f"0,{time.time() - s},expand all rules")
@@ -459,8 +442,7 @@ class Ruleset:
                     beam_list_incl.append(beam)
                 else:
                     beam_list_excl.append(beam)
-
-            
+ 
             # Combine the beams and make GrowInfoBeam objects to store them
             final_info_incl = self.combine_beams(beam_list_incl, "incl")
             final_info_excl = self.combine_beams(beam_list_excl, "excl")
@@ -513,12 +495,9 @@ class Ruleset:
     def update_ruleset_and_get_cl_data_ruleset_after_adding_rule(self, 
                                                                  rule):
         """ Update the ruleset and get the code length of the data and the ruleset after adding a rule
-        Question: Why is the else rule updated here, and not in the ruleset class?
 
         Parameters
         ---
-        ruleset : Ruleset object
-            Ruleset to be updated
         rule : Rule object
             Rule to be added to the ruleset
         Returns
@@ -544,8 +523,8 @@ class Ruleset:
         
         Parameters
         ---
-        ruleset : Ruleset object
-            Ruleset under consideration
+        None
+
         Returns
         ---
         : float
@@ -638,8 +617,6 @@ class PredictUsingRuleset:
         
         Parameters
         ----------
-        ruleset : RuleSet
-            The ruleset for which we want to compute the local prediction.
         X_test : np.array
             The test set.
         
@@ -1093,12 +1070,9 @@ class Rule:
         
         Parameters
         ---
-        ruleset : Ruleset object
-            Ruleset under consideration
-        rule : Rule object
-            Rule under consideration
         bool : Array
             Boolean array indicating which instances are covered by the rule
+
         Returns
         ---
         : float
@@ -1208,10 +1182,6 @@ class Rule:
         
         Parameters
         ---
-        rule : Rule object
-            Rule under consideration
-        ruleset : Ruleset object
-            Full ruleset 
         icol : int
             Index of the feature under consideration
         cut_option : int
@@ -1293,8 +1263,6 @@ class Rule:
         
         Parameters
         ---
-        rule : Rule object
-            Rule to be checked
         icol : int
             Index of the column for which the candidate cut is calculated
         bi_arrays : dict
@@ -1336,8 +1304,6 @@ class Rule:
         
         Parameters
         ---
-        rule : Rule object
-            Rule to be checked
         icol : int
             Index of the column for which the candidate cut is calculated
         bi_arrays : dict
